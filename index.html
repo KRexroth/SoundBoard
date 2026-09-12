@@ -117,6 +117,18 @@
   .error-state code, .empty-state code { background: #10111a; padding: 2px 6px; border-radius: 5px; }
   .hidden { display: none !important; }
 
+  .bot-status {
+    font-size: 0.8rem;
+    padding: 5px 10px;
+    border-radius: 999px;
+    background: #232633;
+    white-space: nowrap;
+  }
+  .bot-status--unknown { color: var(--muted); }
+  .bot-status--connected { color: #7CFC9E; background: rgba(34,197,94,0.15); }
+  .bot-status--idle { color: #eab308; background: rgba(234,179,8,0.15); }
+  .bot-status--offline { color: var(--muted); background: rgba(146,152,172,0.12); }
+
   footer {
     margin-top: 40px;
     color: var(--muted);
@@ -136,6 +148,7 @@
     <label>Volume
       <input type="range" id="volumeSlider" min="0" max="1" step="0.01" value="0.8" />
     </label>
+    <span id="botStatus" class="bot-status bot-status--unknown">● Checking Discord bot…</span>
     <div class="spacer"></div>
     <button id="refreshBtn">↻ Refresh</button>
     <button id="stopAllBtn" class="btn-danger">⏹ Stop All</button>
@@ -156,6 +169,16 @@
   const SOUNDS_FOLDER = "Sounds";
   // -----------------------------------------------------------------------
 
+  // ---- Discord bot bridge ------------------------------------------------
+  // Fill these in once the bot (see the "bot" folder) is running and you've
+  // set up a tunnel (e.g. ngrok) so this public webpage can reach it.
+  // Leave BOT_BASE_URL empty to disable this entirely — tiles will just
+  // keep playing locally in the browser, like before.
+  const BOT_BASE_URL = ""; // e.g. "https://your-name.ngrok-free.app" (no trailing slash)
+  const BOT_SECRET = "";   // must match PLAY_SECRET in the bot's .env
+  const BOT_HEALTH_POLL_MS = 15000;
+  // -----------------------------------------------------------------------
+
   const KEY_ORDER = "1234567890qwertyuiopasdfghjklzxcvbnm".split("");
   const PALETTE = ["#7c5cff", "#22c55e", "#ef4444", "#eab308", "#06b6d4", "#f97316", "#ec4899", "#8b5cf6", "#10b981"];
   const AUDIO_EXTS = new Set(["mp3", "wav", "ogg", "m4a", "flac"]);
@@ -169,6 +192,7 @@
   const volumeSlider = document.getElementById("volumeSlider");
   const stopAllBtn = document.getElementById("stopAllBtn");
   const refreshBtn = document.getElementById("refreshBtn");
+  const botStatusEl = document.getElementById("botStatus");
 
   function currentVolume() {
     return parseFloat(volumeSlider.value);
@@ -200,6 +224,53 @@
       stopVisual();
       console.warn("Playback blocked or failed:", err);
     });
+
+    triggerDiscordPlay(sound.name);
+  }
+
+  // ---- Discord bot bridge --------------------------------------------------
+
+  function setBotStatus(state, text) {
+    botStatusEl.className = "bot-status bot-status--" + state;
+    botStatusEl.textContent = text;
+  }
+
+  async function pollBotHealth() {
+    if (!BOT_BASE_URL) {
+      setBotStatus("offline", "○ Discord bot not set up");
+      return;
+    }
+    try {
+      const res = await fetch(BOT_BASE_URL + "/health");
+      if (!res.ok) throw new Error("bad status " + res.status);
+      const data = await res.json();
+      if (data.connected) {
+        setBotStatus("connected", "● Bot connected — tiles play in Discord too");
+      } else {
+        setBotStatus("idle", "● Bot online, but not in a voice channel (use /join)");
+      }
+    } catch (err) {
+      setBotStatus("offline", "○ Can't reach Discord bot");
+    }
+  }
+
+  function triggerDiscordPlay(soundName) {
+    if (!BOT_BASE_URL) return;
+    fetch(BOT_BASE_URL + "/play", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-play-secret": BOT_SECRET,
+      },
+      body: JSON.stringify({ sound: soundName }),
+    })
+      .then(res => res.json().catch(() => ({})).then(data => ({ res, data })))
+      .then(({ res, data }) => {
+        if (!res.ok) {
+          console.warn("Discord bot didn't play it:", data.error || res.status);
+        }
+      })
+      .catch(err => console.warn("Couldn't reach Discord bot:", err));
   }
 
   function stopAll() {
@@ -285,6 +356,8 @@
   refreshBtn.addEventListener("click", loadSounds);
 
   loadSounds();
+  pollBotHealth();
+  setInterval(pollBotHealth, BOT_HEALTH_POLL_MS);
 </script>
 </body>
 </html>
