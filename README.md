@@ -1,141 +1,87 @@
 # Friend Group Soundboard
 
-A soundboard that builds its grid from whatever `.mp3` (or `.wav`/`.ogg`/`.m4a`)
-files are sitting in the `sounds` folder — no list to maintain, no code to
-edit. Drop a file in, refresh the page, it's a tile.
+A soundboard with no build step and no server: `index.html` asks GitHub
+directly, on every page load, "what's in the `Sounds` folder right now?"
+and turns the answer into a grid of clickable tiles. Add a file to
+`Sounds` on GitHub, refresh the page, it's a tile — nothing else to touch.
 
-Right now it plays on whichever computer has it open (browser audio can't be
-piped into another app on its own). See **Roadmap** below for the plan to
-get a sound to play *into* a Discord voice channel for everyone.
+It's hosted as a GitHub Pages site, so there's one URL anyone can open —
+no downloading, no Python, no local server.
 
-## What's in here
+## How it works
 
-```
-discord-soundboard/
-├── index.html      ← the app: grid + "add a sound" panel
-├── serve.py        ← the tiny local server that makes auto-scanning possible
-├── start.command   ← double-click to launch on Mac
-├── start.bat       ← double-click to launch on Windows
-├── start.sh        ← run to launch on Linux
-├── sounds/         ← your audio files live here
-│   ├── beep.mp3    ← sample tones so the grid works before you add real clips
-│   ├── ding.mp3
-│   └── buzz.mp3
-└── README.md
-```
+`index.html` calls GitHub's public API —
+`api.github.com/repos/KRexroth/SoundBoard/contents/Sounds` — which lists
+whatever files are in that folder. For each audio file it gets back, it
+builds a tile named after the filename (`air-horn.mp3` → "Air Horn") and
+points it at that file's direct GitHub URL. Clicking a tile just plays
+that URL with a normal HTML `<audio>` element — it plays on whichever
+device has the page open.
 
-## Why there's a server now
+Because this reads the *public* GitHub API, the repo has to be public for
+it to work (see below for why that's fine here).
 
-A webpage opened by double-clicking it (`file://…`) is blocked by every
-browser from looking inside its own folder or accepting a real file upload —
-that's a security restriction, not something this app can work around.
-`serve.py` is a small script (Python's standard library only, nothing to
-install) that runs *on your own computer* and gives the page a real backend:
-it lists what's actually in `sounds/` on every page load, and saves anything
-uploaded through the panel straight into that folder. That's what makes
-"just drop a file in and it shows up" possible.
+## Managing sounds
 
-## Launching it
+You (Kevin) add and remove files directly in the `Sounds` folder on
+github.com — via **Add file → Upload files**, dragging files onto that
+folder, or however else you'd normally edit files on GitHub. There's no
+upload feature in the page itself by design — this keeps "who can add
+sounds" simply "whoever has push access to the repo," which is you.
 
-You'll need Python 3 installed (Mac and Linux almost always have it already;
-on Windows, install it from [python.org](https://www.python.org/downloads/)
-if `python` isn't recognized — check "Add python.exe to PATH" during setup).
+## About the repo being public
 
-- **Mac:** double-click `start.command`. First time only, macOS may warn
-  it's from an unidentified developer — right-click it and choose **Open**
-  instead, once.
-- **Windows:** double-click `start.bat`.
-- **Linux:** run `./start.sh` (or `python3 serve.py`) from a terminal in
-  this folder.
+A GitHub Pages site is always publicly reachable by its URL, *regardless*
+of whether the source repo is public or private — private-repo Pages is a
+paid-plan feature, and even then the published page itself still isn't
+access-restricted. So making the repo public doesn't give up anything
+here: it just means anyone can view the code and the sound files (fine for
+a set of fun clips), while push access — actually adding or changing
+files — is still limited to you and anyone you explicitly add as a
+collaborator, independent of the public/private setting.
 
-Any of these opens your browser to `http://localhost:8000` with the grid
-already populated. Leave the terminal/command window open while you use it;
-closing it stops the server. Press **Ctrl+C** in that window to stop it
-cleanly.
+## Setting up GitHub Pages (one-time)
 
-## Adding a new sound
+1. Repo **Settings → General → Danger Zone → Change visibility → Public**.
+2. Repo **Settings → Pages → Build and deployment → Source: Deploy from a
+   branch → Branch: `main`, folder `/(root)` → Save**.
+3. After a minute, GitHub shows the live URL — something like
+   `https://krexroth.github.io/SoundBoard/`. That's the link to share.
 
-Two ways, both instant — no code, no restart needed:
+## Notes
 
-1. **Through the page:** open **Add a new sound**, pick a file, type a
-   display name, hit **Preview** to check it, then **Add to soundboard**.
-   It's saved into `sounds/` and shows up in the grid right away.
-2. **By hand:** just drop an audio file into the `sounds` folder yourself
-   and click **Refresh** on the page (or reload it). The tile's name comes
-   from the filename — `air-horn.mp3` becomes "Air Horn", `WOW.mp3` stays
-   "WOW".
-
-## Sharing sounds with your friends via GitHub
-
-The server keeps everything local to your machine — it doesn't touch
-GitHub by itself. To get a sound into the shared repo so friends running
-their own copy get it too, commit and push the `sounds` folder whenever
-it's convenient:
-
-```bash
-git add sounds/
-git commit -m "Add new sounds"
-git push
-```
-
-### First time putting this on GitHub
-
-1. Go to [github.com/new](https://github.com/new), name the repo (e.g.
-   `discord-soundboard`), keep it **Public**, and create it without a
-   README (this one's already written).
-2. On the repo page, **Add file → Upload files**, and drag in everything
-   in this folder (including the `sounds` subfolder — GitHub preserves the
-   structure).
-3. Commit to `main`.
-
-Or with git directly:
-
-```bash
-git init
-git add .
-git commit -m "Initial soundboard"
-git branch -M main
-git remote add origin https://github.com/<your-username>/discord-soundboard.git
-git push -u origin main
-```
-
-Each friend who wants their own local copy clones the repo and launches it
-the same way (`start.command` / `start.bat` / `start.sh`) — Python is the
-only thing they need installed.
+- Supported formats: `.mp3`, `.wav`, `.ogg`, `.m4a`, `.flac`.
+- Sounds can overlap — clicking a second tile doesn't cut off the first.
+- Keyboard shortcuts (shown on each tile) trigger the same sound; **Esc**
+  stops everything.
+- GitHub's public API is rate-limited to 60 requests/hour per visitor IP
+  with no login — plenty for casual use, but if a lot of people are
+  mashing Refresh in a short window, loads can start failing until the
+  hour rolls over.
 
 ## Roadmap: making it play in the actual Discord call
 
 This is the bigger step, whenever you're ready for it. The short version:
 
-A browser tab (or this local server) can only make sound come out of *your*
-speakers — nothing here can inject audio into someone else's app, including
-Discord. To have a click be heard by the whole voice channel, something
-needs to actually **join the call as a participant** and stream the audio
-in. That's a Discord bot, and it needs:
+A browser tab can only make sound come out of *your* speakers — nothing
+here can inject audio into someone else's app, including Discord. To have
+a click be heard by the whole voice channel, something needs to actually
+**join the call as a participant** and stream the audio in. That's a
+Discord bot, and it needs:
 
 - A bot application registered in the
   [Discord Developer Portal](https://discord.com/developers/applications),
-  invited to your server with permission to connect/speak in voice channels.
+  invited to your server with permission to connect/speak in voice
+  channels.
 - A small always-running Node.js process (`discord.js` +
   `@discordjs/voice`, plus `ffmpeg` for decoding) that joins your voice
-  channel and plays a file from this same `sounds/` folder on command
-  (a Discord slash command like `/play ding`, or this webpage calling an
-  API the bot exposes).
+  channel and plays a file from the same `Sounds` folder on command (a
+  slash command like `/play ding`, or this page calling an API the bot
+  exposes).
 - Somewhere for that process to run continuously — your own PC while
   everyone's in the call, a Raspberry Pi, or a cheap/free host (Railway,
   Fly.io, a small VPS).
 
-Handy detail: `serve.py` is already "a small persistent process that
-manages the sound files." The Discord bot phase is realistically an
-extension of this same server (add a Discord client alongside the HTTP
-one) rather than a throwaway rewrite — so nothing here is wasted work.
-Come back when you're ready to build that part.
-
-## Notes
-
-- Sounds can overlap — clicking a second tile doesn't cut off the first.
-- Keyboard shortcuts (shown on each tile) trigger the same sound; **Esc**
-  stops everything.
-- Supported formats: `.mp3`, `.wav`, `.ogg`, `.m4a`, `.flac`.
-- Everything stays on your machine — the server only listens on
-  `localhost`, nothing is exposed to the network.
+Since the sound files already live in this repo's `Sounds` folder, the
+bot can read from the exact same place this page does — no rework needed
+there when you're ready to build it.

@@ -12,7 +12,6 @@
     --text: #f2f3f7;
     --muted: #9298ac;
     --accent: #7c5cff;
-    --accent-2: #22c55e;
     --danger: #ef4444;
     --tile-radius: 14px;
   }
@@ -30,6 +29,7 @@
   header { margin-bottom: 20px; }
   h1 { font-size: 1.6rem; margin: 0 0 4px; }
   .subtitle { color: var(--muted); font-size: 0.92rem; margin: 0; }
+  .subtitle code { background: #232633; padding: 1px 6px; border-radius: 5px; }
 
   .toolbar {
     display: flex;
@@ -55,11 +55,8 @@
   }
   button:hover { background: #2b2f40; }
   button:active { transform: scale(0.97); }
-  button:disabled { opacity: 0.5; cursor: default; }
   .btn-danger { background: rgba(239,68,68,0.15); color: #ff8a8a; }
   .btn-danger:hover { background: rgba(239,68,68,0.28); }
-  .btn-accent { background: var(--accent); color: white; }
-  .btn-accent:hover { filter: brightness(1.08); }
   .spacer { flex: 1; }
 
   .grid {
@@ -117,45 +114,7 @@
     line-height: 1.6;
   }
   .error-state { color: #ff8a8a; }
-  .error-state code { background: #10111a; padding: 2px 6px; border-radius: 5px; }
-
-  details.add-panel {
-    background: var(--panel);
-    border-radius: 12px;
-    padding: 4px 18px 18px;
-    margin-top: 10px;
-  }
-  details.add-panel > summary {
-    cursor: pointer;
-    padding: 14px 0;
-    font-weight: 600;
-    list-style: none;
-  }
-  details.add-panel > summary::-webkit-details-marker { display: none; }
-  details.add-panel > summary::before {
-    content: "+ ";
-    color: var(--accent);
-  }
-  details.add-panel[open] > summary::before { content: "\2212 "; }
-
-  .field { margin-bottom: 14px; }
-  .field label { display: block; font-size: 0.85rem; color: var(--muted); margin-bottom: 6px; }
-  .field input[type="text"] {
-    width: 100%;
-    padding: 10px 12px;
-    border-radius: 8px;
-    border: 1px solid #33384a;
-    background: #101116;
-    color: var(--text);
-    font: inherit;
-  }
-  .field input[type="file"] { color: var(--muted); }
-
-  .row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
-  .hint { font-size: 0.8rem; color: var(--muted); margin-top: 10px; }
-  .status { font-size: 0.85rem; margin-top: 10px; min-height: 1.2em; }
-  .status.ok { color: #7ee787; }
-  .status.err { color: #ff8a8a; }
+  .error-state code, .empty-state code { background: #10111a; padding: 2px 6px; border-radius: 5px; }
   .hidden { display: none !important; }
 
   footer {
@@ -170,7 +129,7 @@
 <div class="wrap">
   <header>
     <h1>🔊 Friend Group Soundboard</h1>
-    <p class="subtitle">The grid below is built from whatever's in the <code>sounds</code> folder right now — drop a file in and refresh, or use the panel below to add one. Plays on your own PC for now; see the README for the Discord voice-channel plan.</p>
+    <p class="subtitle">Click a tile to play it. The grid is built live from whatever's in the <code>Sounds</code> folder of the GitHub repo.</p>
   </header>
 
   <div class="toolbar">
@@ -183,37 +142,23 @@
   </div>
 
   <div id="grid" class="grid"></div>
-  <div id="emptyState" class="empty-state hidden">No sounds in the <code>sounds</code> folder yet — add one below, or just drop an mp3 in there and hit Refresh.</div>
+  <div id="emptyState" class="empty-state hidden">No sounds in the <code>Sounds</code> folder yet.</div>
   <div id="errorState" class="error-state hidden"></div>
 
-  <details class="add-panel">
-    <summary>Add a new sound</summary>
-
-    <div class="field">
-      <label for="soundFile">Sound file</label>
-      <input type="file" id="soundFile" accept="audio/*,.mp3,.wav,.ogg,.m4a" />
-    </div>
-
-    <div class="field">
-      <label for="soundName">Display name (what shows on the tile)</label>
-      <input type="text" id="soundName" placeholder="e.g. Air Horn" />
-    </div>
-
-    <div class="row">
-      <button id="previewBtn">▶ Preview</button>
-      <button id="uploadBtn" class="btn-accent">Add to soundboard</button>
-    </div>
-    <p id="uploadStatus" class="status"></p>
-    <p class="hint">This saves the file straight into your local <code>sounds</code> folder and it shows up in the grid immediately — no editing any code. If you want your friends to have it too, commit and push the <code>sounds</code> folder to your GitHub repo whenever you get a chance.</p>
-  </details>
-
-  <footer>Runs through the little local server in this folder — nothing leaves your machine.</footer>
+  <footer>Sounds are managed directly on GitHub — nothing to upload here.</footer>
 </div>
 
 <script>
-  // Keys assigned to tiles in order, for fast triggering during a call.
+  // ---- Configure this for your repo -----------------------------------
+  const GITHUB_OWNER = "KRexroth";
+  const GITHUB_REPO = "SoundBoard";
+  const GITHUB_BRANCH = "main";
+  const SOUNDS_FOLDER = "Sounds";
+  // -----------------------------------------------------------------------
+
   const KEY_ORDER = "1234567890qwertyuiopasdfghjklzxcvbnm".split("");
   const PALETTE = ["#7c5cff", "#22c55e", "#ef4444", "#eab308", "#06b6d4", "#f97316", "#ec4899", "#8b5cf6", "#10b981"];
+  const AUDIO_EXTS = new Set(["mp3", "wav", "ogg", "m4a", "flac"]);
 
   let SOUNDS = [];
   let activeAudios = [];
@@ -229,8 +174,14 @@
     return parseFloat(volumeSlider.value);
   }
 
+  function humanize(filename) {
+    const stem = filename.replace(/\.[^/.]+$/, "");
+    const words = stem.split(/[-_]+/).map(w => (/^[a-z0-9]+$/.test(w) ? w[0].toUpperCase() + w.slice(1) : w));
+    return words.join(" ") || filename;
+  }
+
   function playSound(sound, tileEl) {
-    const audio = new Audio("sounds/" + encodeURIComponent(sound.file));
+    const audio = new Audio(sound.url);
     audio.volume = currentVolume();
     activeAudios.push(audio);
 
@@ -242,7 +193,7 @@
     audio.addEventListener("ended", stopVisual);
     audio.addEventListener("error", () => {
       stopVisual();
-      console.warn("Couldn't play " + sound.file);
+      console.warn("Couldn't play " + sound.url);
     });
 
     audio.play().catch(err => {
@@ -287,10 +238,23 @@
   }
 
   async function loadSounds() {
+    const apiUrl = `https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}/contents/${encodeURIComponent(SOUNDS_FOLDER)}?ref=${GITHUB_BRANCH}`;
     try {
-      const res = await fetch("/api/sounds", { cache: "no-store" });
-      if (!res.ok) throw new Error("Server responded with " + res.status);
-      SOUNDS = await res.json();
+      const res = await fetch(apiUrl, { headers: { Accept: "application/vnd.github+json" } });
+      if (res.status === 404) {
+        SOUNDS = [];
+        errorState.classList.add("hidden");
+        renderGrid();
+        return;
+      }
+      if (!res.ok) throw new Error("GitHub API responded with " + res.status);
+      const entries = await res.json();
+
+      SOUNDS = entries
+        .filter(e => e.type === "file" && AUDIO_EXTS.has((e.name.split(".").pop() || "").toLowerCase()))
+        .sort((a, b) => a.name.localeCompare(b.name))
+        .map(e => ({ name: humanize(e.name), url: e.download_url }));
+
       errorState.classList.add("hidden");
       renderGrid();
     } catch (err) {
@@ -298,16 +262,16 @@
       emptyState.classList.add("hidden");
       errorState.classList.remove("hidden");
       errorState.innerHTML =
-        "Couldn't reach the local server, so the folder can't be scanned.<br>" +
-        "Make sure you launched this page by running <code>start.command</code> / <code>start.bat</code> " +
-        "(or <code>python3 serve.py</code>) rather than opening index.html directly.";
+        "Couldn't load the sound list from GitHub.<br>" +
+        "If you just added sounds, GitHub's API is occasionally a few seconds behind — try Refresh. " +
+        "Otherwise check that the repo is public and the <code>" + SOUNDS_FOLDER + "</code> folder exists.";
       console.warn("Failed to load sounds:", err);
     }
   }
 
   document.addEventListener("keydown", (e) => {
     const tag = (e.target && e.target.tagName) || "";
-    if (tag === "INPUT" || tag === "TEXTAREA") return; // don't hijack typing
+    if (tag === "INPUT" || tag === "TEXTAREA") return;
     if (e.key === "Escape") { stopAll(); return; }
 
     const idx = SOUNDS.findIndex(s => s._key === e.key.toLowerCase());
@@ -321,60 +285,6 @@
   refreshBtn.addEventListener("click", loadSounds);
 
   loadSounds();
-
-  // ---- Add-a-new-sound panel -----------------------------------------
-  const soundFileInput = document.getElementById("soundFile");
-  const soundNameInput = document.getElementById("soundName");
-  const previewBtn = document.getElementById("previewBtn");
-  const uploadBtn = document.getElementById("uploadBtn");
-  const uploadStatus = document.getElementById("uploadStatus");
-
-  let previewUrl = null;
-
-  previewBtn.addEventListener("click", () => {
-    const file = soundFileInput.files[0];
-    if (!file) { uploadStatus.textContent = "Choose a file first."; uploadStatus.className = "status err"; return; }
-    if (previewUrl) URL.revokeObjectURL(previewUrl);
-    previewUrl = URL.createObjectURL(file);
-    const audio = new Audio(previewUrl);
-    audio.volume = currentVolume();
-    audio.play().catch(err => {
-      uploadStatus.textContent = "Couldn't preview that file: " + err.message;
-      uploadStatus.className = "status err";
-    });
-  });
-
-  uploadBtn.addEventListener("click", async () => {
-    const file = soundFileInput.files[0];
-    const name = soundNameInput.value.trim();
-    if (!file) { uploadStatus.textContent = "Choose a file first."; uploadStatus.className = "status err"; return; }
-    if (!name) { uploadStatus.textContent = "Give it a display name first."; uploadStatus.className = "status err"; return; }
-
-    uploadBtn.disabled = true;
-    uploadStatus.textContent = "Uploading…";
-    uploadStatus.className = "status";
-
-    const formData = new FormData();
-    formData.append("file", file);
-    formData.append("name", name);
-
-    try {
-      const res = await fetch("/api/upload", { method: "POST", body: formData });
-      const data = await res.json();
-      if (!res.ok || !data.ok) throw new Error(data.error || "Upload failed");
-
-      uploadStatus.textContent = `Added "${data.name}" — it's live in the grid now.`;
-      uploadStatus.className = "status ok";
-      soundFileInput.value = "";
-      soundNameInput.value = "";
-      await loadSounds();
-    } catch (err) {
-      uploadStatus.textContent = "Couldn't add that sound: " + err.message;
-      uploadStatus.className = "status err";
-    } finally {
-      uploadBtn.disabled = false;
-    }
-  });
 </script>
 </body>
 </html>
