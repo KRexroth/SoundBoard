@@ -136,6 +136,10 @@
     <label>Volume
       <input type="range" id="volumeSlider" min="0" max="1" step="0.01" value="0.8" />
     </label>
+    <label>Output
+      <select id="outputSelect"><option value="">Default (this computer's speakers)</option></select>
+    </label>
+    <button id="enableDevicesBtn" title="Grant one-time mic permission so device names show up in the list above">🔓 Show devices</button>
     <div class="spacer"></div>
     <button id="refreshBtn">↻ Refresh</button>
     <button id="stopAllBtn" class="btn-danger">⏹ Stop All</button>
@@ -144,6 +148,14 @@
   <div id="grid" class="grid"></div>
   <div id="emptyState" class="empty-state hidden">No sounds in the <code>Sounds</code> folder yet.</div>
   <div id="errorState" class="error-state hidden"></div>
+
+  <p class="subtitle" id="outputHint">
+    Want your friends to hear these in a Discord call? Install a free virtual audio cable
+    (<a href="https://vb-audio.com/Voicemeeter/" target="_blank" rel="noopener">VoiceMeeter</a> or
+    <a href="https://vb-audio.com/Cable/" target="_blank" rel="noopener">VB-Cable</a>), then pick it from
+    the <strong>Output</strong> dropdown above and set that same device as your microphone in Discord.
+    This page will remember your choice. Works in Chrome/Edge.
+  </p>
 
   <footer>Sounds are managed directly on GitHub — nothing to upload here.</footer>
 </div>
@@ -169,10 +181,73 @@
   const volumeSlider = document.getElementById("volumeSlider");
   const stopAllBtn = document.getElementById("stopAllBtn");
   const refreshBtn = document.getElementById("refreshBtn");
+  const outputSelect = document.getElementById("outputSelect");
+  const enableDevicesBtn = document.getElementById("enableDevicesBtn");
+
+  const SINK_SUPPORTED = typeof HTMLMediaElement !== "undefined" && "setSinkId" in HTMLMediaElement.prototype;
+  const OUTPUT_STORAGE_KEY = "soundboard-output-device-id";
 
   function currentVolume() {
     return parseFloat(volumeSlider.value);
   }
+
+  function getSavedSinkId() {
+    try { return localStorage.getItem(OUTPUT_STORAGE_KEY) || ""; } catch { return ""; }
+  }
+  function saveSinkId(id) {
+    try { localStorage.setItem(OUTPUT_STORAGE_KEY, id); } catch {}
+  }
+
+  async function populateOutputDevices() {
+    if (!SINK_SUPPORTED) {
+      outputSelect.innerHTML = "<option value=''>Not supported in this browser</option>";
+      outputSelect.disabled = true;
+      enableDevicesBtn.classList.add("hidden");
+      return;
+    }
+    let devices;
+    try {
+      devices = await navigator.mediaDevices.enumerateDevices();
+    } catch (err) {
+      console.warn("Couldn't enumerate audio devices:", err);
+      return;
+    }
+    const outputs = devices.filter(d => d.kind === "audiooutput");
+    const saved = getSavedSinkId();
+
+    outputSelect.innerHTML = "";
+    const defaultOpt = document.createElement("option");
+    defaultOpt.value = "";
+    defaultOpt.textContent = "Default (this computer's speakers)";
+    outputSelect.appendChild(defaultOpt);
+
+    outputs.forEach(d => {
+      if (!d.deviceId) return;
+      const opt = document.createElement("option");
+      opt.value = d.deviceId;
+      opt.textContent = d.label || ("Output device " + d.deviceId.slice(0, 6));
+      outputSelect.appendChild(opt);
+    });
+
+    outputSelect.value = outputs.some(d => d.deviceId === saved) ? saved : "";
+
+    const gotLabels = outputs.some(d => d.label);
+    enableDevicesBtn.classList.toggle("hidden", gotLabels);
+  }
+
+  enableDevicesBtn.addEventListener("click", async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      stream.getTracks().forEach(t => t.stop());
+      await populateOutputDevices();
+    } catch (err) {
+      alert("Couldn't list audio devices (permission denied or unsupported). You can still use the default speakers.\n\n" + err.message);
+    }
+  });
+
+  outputSelect.addEventListener("change", () => {
+    saveSinkId(outputSelect.value);
+  });
 
   function humanize(filename) {
     const stem = filename.replace(/\.[^/.]+$/, "");
@@ -196,10 +271,22 @@
       console.warn("Couldn't play " + sound.url);
     });
 
-    audio.play().catch(err => {
-      stopVisual();
-      console.warn("Playback blocked or failed:", err);
-    });
+    const sinkId = getSavedSinkId();
+    const startPlayback = () => {
+      audio.play().catch(err => {
+        stopVisual();
+        console.warn("Playback blocked or failed:", err);
+      });
+    };
+
+    if (sinkId && SINK_SUPPORTED) {
+      audio.setSinkId(sinkId).then(startPlayback).catch(err => {
+        console.warn("Couldn't route to chosen output device, falling back to default:", err);
+        startPlayback();
+      });
+    } else {
+      startPlayback();
+    }
   }
 
   function stopAll() {
@@ -284,6 +371,11 @@
   stopAllBtn.addEventListener("click", stopAll);
   refreshBtn.addEventListener("click", loadSounds);
 
+  if (navigator.mediaDevices && navigator.mediaDevices.addEventListener) {
+    navigator.mediaDevices.addEventListener("devicechange", populateOutputDevices);
+  }
+
+  populateOutputDevices();
   loadSounds();
 </script>
 </body>
