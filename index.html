@@ -1,0 +1,380 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Friend Group Soundboard</title>
+<style>
+  :root{
+    --bg: #14151a;
+    --panel: #1c1e26;
+    --panel-2: #232633;
+    --text: #f2f3f7;
+    --muted: #9298ac;
+    --accent: #7c5cff;
+    --accent-2: #22c55e;
+    --danger: #ef4444;
+    --tile-radius: 14px;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0;
+    padding: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  }
+  body { padding: 24px 16px 80px; }
+  .wrap { max-width: 980px; margin: 0 auto; }
+
+  header { margin-bottom: 20px; }
+  h1 { font-size: 1.6rem; margin: 0 0 4px; }
+  .subtitle { color: var(--muted); font-size: 0.92rem; margin: 0; }
+
+  .toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 12px;
+    margin: 18px 0;
+    padding: 12px 14px;
+    background: var(--panel);
+    border-radius: 12px;
+  }
+  .toolbar label { font-size: 0.85rem; color: var(--muted); display: flex; align-items: center; gap: 8px; }
+  .toolbar input[type="range"] { width: 140px; }
+  button {
+    font: inherit;
+    cursor: pointer;
+    border: none;
+    border-radius: 10px;
+    padding: 9px 14px;
+    color: var(--text);
+    background: var(--panel-2);
+    transition: transform 0.06s ease, background 0.15s ease;
+  }
+  button:hover { background: #2b2f40; }
+  button:active { transform: scale(0.97); }
+  button:disabled { opacity: 0.5; cursor: default; }
+  .btn-danger { background: rgba(239,68,68,0.15); color: #ff8a8a; }
+  .btn-danger:hover { background: rgba(239,68,68,0.28); }
+  .btn-accent { background: var(--accent); color: white; }
+  .btn-accent:hover { filter: brightness(1.08); }
+  .spacer { flex: 1; }
+
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    gap: 14px;
+    margin: 20px 0 30px;
+  }
+  .tile {
+    position: relative;
+    aspect-ratio: 1 / 1;
+    border-radius: var(--tile-radius);
+    border: none;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: 10px;
+    font-weight: 600;
+    font-size: 0.95rem;
+    line-height: 1.25;
+    color: white;
+    box-shadow: 0 2px 0 rgba(0,0,0,0.25) inset, 0 6px 14px rgba(0,0,0,0.25);
+    transition: transform 0.08s ease, box-shadow 0.15s ease;
+    word-break: break-word;
+  }
+  .tile:hover { transform: translateY(-2px); }
+  .tile:active { transform: translateY(0px) scale(0.97); }
+  .tile.playing {
+    box-shadow: 0 0 0 3px rgba(255,255,255,0.85) inset, 0 6px 18px rgba(0,0,0,0.35);
+    animation: pulse 0.5s ease-in-out infinite alternate;
+  }
+  @keyframes pulse {
+    from { filter: brightness(1); }
+    to { filter: brightness(1.18); }
+  }
+  .key-badge {
+    position: absolute;
+    top: 6px;
+    left: 8px;
+    font-size: 0.68rem;
+    font-weight: 700;
+    background: rgba(0,0,0,0.35);
+    padding: 2px 6px;
+    border-radius: 6px;
+    letter-spacing: 0.02em;
+  }
+  .empty-state, .error-state {
+    color: var(--muted);
+    background: var(--panel);
+    border-radius: 12px;
+    padding: 28px;
+    text-align: center;
+    line-height: 1.6;
+  }
+  .error-state { color: #ff8a8a; }
+  .error-state code { background: #10111a; padding: 2px 6px; border-radius: 5px; }
+
+  details.add-panel {
+    background: var(--panel);
+    border-radius: 12px;
+    padding: 4px 18px 18px;
+    margin-top: 10px;
+  }
+  details.add-panel > summary {
+    cursor: pointer;
+    padding: 14px 0;
+    font-weight: 600;
+    list-style: none;
+  }
+  details.add-panel > summary::-webkit-details-marker { display: none; }
+  details.add-panel > summary::before {
+    content: "+ ";
+    color: var(--accent);
+  }
+  details.add-panel[open] > summary::before { content: "\2212 "; }
+
+  .field { margin-bottom: 14px; }
+  .field label { display: block; font-size: 0.85rem; color: var(--muted); margin-bottom: 6px; }
+  .field input[type="text"] {
+    width: 100%;
+    padding: 10px 12px;
+    border-radius: 8px;
+    border: 1px solid #33384a;
+    background: #101116;
+    color: var(--text);
+    font: inherit;
+  }
+  .field input[type="file"] { color: var(--muted); }
+
+  .row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+  .hint { font-size: 0.8rem; color: var(--muted); margin-top: 10px; }
+  .status { font-size: 0.85rem; margin-top: 10px; min-height: 1.2em; }
+  .status.ok { color: #7ee787; }
+  .status.err { color: #ff8a8a; }
+  .hidden { display: none !important; }
+
+  footer {
+    margin-top: 40px;
+    color: var(--muted);
+    font-size: 0.8rem;
+    text-align: center;
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>🔊 Friend Group Soundboard</h1>
+    <p class="subtitle">The grid below is built from whatever's in the <code>sounds</code> folder right now — drop a file in and refresh, or use the panel below to add one. Plays on your own PC for now; see the README for the Discord voice-channel plan.</p>
+  </header>
+
+  <div class="toolbar">
+    <label>Volume
+      <input type="range" id="volumeSlider" min="0" max="1" step="0.01" value="0.8" />
+    </label>
+    <div class="spacer"></div>
+    <button id="refreshBtn">↻ Refresh</button>
+    <button id="stopAllBtn" class="btn-danger">⏹ Stop All</button>
+  </div>
+
+  <div id="grid" class="grid"></div>
+  <div id="emptyState" class="empty-state hidden">No sounds in the <code>sounds</code> folder yet — add one below, or just drop an mp3 in there and hit Refresh.</div>
+  <div id="errorState" class="error-state hidden"></div>
+
+  <details class="add-panel">
+    <summary>Add a new sound</summary>
+
+    <div class="field">
+      <label for="soundFile">Sound file</label>
+      <input type="file" id="soundFile" accept="audio/*,.mp3,.wav,.ogg,.m4a" />
+    </div>
+
+    <div class="field">
+      <label for="soundName">Display name (what shows on the tile)</label>
+      <input type="text" id="soundName" placeholder="e.g. Air Horn" />
+    </div>
+
+    <div class="row">
+      <button id="previewBtn">▶ Preview</button>
+      <button id="uploadBtn" class="btn-accent">Add to soundboard</button>
+    </div>
+    <p id="uploadStatus" class="status"></p>
+    <p class="hint">This saves the file straight into your local <code>sounds</code> folder and it shows up in the grid immediately — no editing any code. If you want your friends to have it too, commit and push the <code>sounds</code> folder to your GitHub repo whenever you get a chance.</p>
+  </details>
+
+  <footer>Runs through the little local server in this folder — nothing leaves your machine.</footer>
+</div>
+
+<script>
+  // Keys assigned to tiles in order, for fast triggering during a call.
+  const KEY_ORDER = "1234567890qwertyuiopasdfghjklzxcvbnm".split("");
+  const PALETTE = ["#7c5cff", "#22c55e", "#ef4444", "#eab308", "#06b6d4", "#f97316", "#ec4899", "#8b5cf6", "#10b981"];
+
+  let SOUNDS = [];
+  let activeAudios = [];
+
+  const grid = document.getElementById("grid");
+  const emptyState = document.getElementById("emptyState");
+  const errorState = document.getElementById("errorState");
+  const volumeSlider = document.getElementById("volumeSlider");
+  const stopAllBtn = document.getElementById("stopAllBtn");
+  const refreshBtn = document.getElementById("refreshBtn");
+
+  function currentVolume() {
+    return parseFloat(volumeSlider.value);
+  }
+
+  function playSound(sound, tileEl) {
+    const audio = new Audio("sounds/" + encodeURIComponent(sound.file));
+    audio.volume = currentVolume();
+    activeAudios.push(audio);
+
+    tileEl.classList.add("playing");
+    const stopVisual = () => {
+      tileEl.classList.remove("playing");
+      activeAudios = activeAudios.filter(a => a !== audio);
+    };
+    audio.addEventListener("ended", stopVisual);
+    audio.addEventListener("error", () => {
+      stopVisual();
+      console.warn("Couldn't play " + sound.file);
+    });
+
+    audio.play().catch(err => {
+      stopVisual();
+      console.warn("Playback blocked or failed:", err);
+    });
+  }
+
+  function stopAll() {
+    activeAudios.forEach(a => { a.pause(); a.currentTime = 0; });
+    activeAudios = [];
+    document.querySelectorAll(".tile.playing").forEach(t => t.classList.remove("playing"));
+  }
+
+  function renderGrid() {
+    grid.innerHTML = "";
+    if (SOUNDS.length === 0) {
+      emptyState.classList.remove("hidden");
+      return;
+    }
+    emptyState.classList.add("hidden");
+
+    SOUNDS.forEach((sound, i) => {
+      const btn = document.createElement("button");
+      btn.className = "tile";
+      btn.style.background = PALETTE[i % PALETTE.length];
+      btn.textContent = sound.name;
+      btn.title = "Play " + sound.name;
+
+      const key = KEY_ORDER[i];
+      if (key) {
+        const badge = document.createElement("span");
+        badge.className = "key-badge";
+        badge.textContent = key.toUpperCase();
+        btn.appendChild(badge);
+        sound._key = key;
+      }
+
+      btn.addEventListener("click", () => playSound(sound, btn));
+      grid.appendChild(btn);
+    });
+  }
+
+  async function loadSounds() {
+    try {
+      const res = await fetch("/api/sounds", { cache: "no-store" });
+      if (!res.ok) throw new Error("Server responded with " + res.status);
+      SOUNDS = await res.json();
+      errorState.classList.add("hidden");
+      renderGrid();
+    } catch (err) {
+      grid.innerHTML = "";
+      emptyState.classList.add("hidden");
+      errorState.classList.remove("hidden");
+      errorState.innerHTML =
+        "Couldn't reach the local server, so the folder can't be scanned.<br>" +
+        "Make sure you launched this page by running <code>start.command</code> / <code>start.bat</code> " +
+        "(or <code>python3 serve.py</code>) rather than opening index.html directly.";
+      console.warn("Failed to load sounds:", err);
+    }
+  }
+
+  document.addEventListener("keydown", (e) => {
+    const tag = (e.target && e.target.tagName) || "";
+    if (tag === "INPUT" || tag === "TEXTAREA") return; // don't hijack typing
+    if (e.key === "Escape") { stopAll(); return; }
+
+    const idx = SOUNDS.findIndex(s => s._key === e.key.toLowerCase());
+    if (idx !== -1) {
+      const tileEl = grid.children[idx];
+      if (tileEl) playSound(SOUNDS[idx], tileEl);
+    }
+  });
+
+  stopAllBtn.addEventListener("click", stopAll);
+  refreshBtn.addEventListener("click", loadSounds);
+
+  loadSounds();
+
+  // ---- Add-a-new-sound panel -----------------------------------------
+  const soundFileInput = document.getElementById("soundFile");
+  const soundNameInput = document.getElementById("soundName");
+  const previewBtn = document.getElementById("previewBtn");
+  const uploadBtn = document.getElementById("uploadBtn");
+  const uploadStatus = document.getElementById("uploadStatus");
+
+  let previewUrl = null;
+
+  previewBtn.addEventListener("click", () => {
+    const file = soundFileInput.files[0];
+    if (!file) { uploadStatus.textContent = "Choose a file first."; uploadStatus.className = "status err"; return; }
+    if (previewUrl) URL.revokeObjectURL(previewUrl);
+    previewUrl = URL.createObjectURL(file);
+    const audio = new Audio(previewUrl);
+    audio.volume = currentVolume();
+    audio.play().catch(err => {
+      uploadStatus.textContent = "Couldn't preview that file: " + err.message;
+      uploadStatus.className = "status err";
+    });
+  });
+
+  uploadBtn.addEventListener("click", async () => {
+    const file = soundFileInput.files[0];
+    const name = soundNameInput.value.trim();
+    if (!file) { uploadStatus.textContent = "Choose a file first."; uploadStatus.className = "status err"; return; }
+    if (!name) { uploadStatus.textContent = "Give it a display name first."; uploadStatus.className = "status err"; return; }
+
+    uploadBtn.disabled = true;
+    uploadStatus.textContent = "Uploading…";
+    uploadStatus.className = "status";
+
+    const formData = new FormData();
+    formData.append("file", file);
+    formData.append("name", name);
+
+    try {
+      const res = await fetch("/api/upload", { method: "POST", body: formData });
+      const data = await res.json();
+      if (!res.ok || !data.ok) throw new Error(data.error || "Upload failed");
+
+      uploadStatus.textContent = `Added "${data.name}" — it's live in the grid now.`;
+      uploadStatus.className = "status ok";
+      soundFileInput.value = "";
+      soundNameInput.value = "";
+      await loadSounds();
+    } catch (err) {
+      uploadStatus.textContent = "Couldn't add that sound: " + err.message;
+      uploadStatus.className = "status err";
+    } finally {
+      uploadBtn.disabled = false;
+    }
+  });
+</script>
+</body>
+</html>
