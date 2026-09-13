@@ -170,11 +170,12 @@
   // -----------------------------------------------------------------------
 
   // ---- Discord bot bridge ------------------------------------------------
-  // Fill these in once the bot (see the "bot" folder) is running and you've
-  // set up a tunnel (e.g. ngrok) so this public webpage can reach it.
-  // Leave BOT_BASE_URL empty to disable this entirely — tiles will just
-  // keep playing locally in the browser, like before.
-  const BOT_BASE_URL = "https://crushable-atonable-runner.ngrok-free.dev"; // no trailing slash
+  // The bot's address changes every time its tunnel restarts, so instead of a
+  // fixed URL here, the page reads it from bridge.json (in this same repo) —
+  // the bot keeps that file updated automatically while it's running. If the
+  // bot isn't running, or bridge.json has no address yet, tiles just keep
+  // playing locally in the browser, like before.
+  let BOT_BASE_URL = ""; // populated automatically from bridge.json — don't hardcode this
   const BOT_SECRET = "make-up-any-random-string-here";   // must match PLAY_SECRET in the bot's .env
   const BOT_HEALTH_POLL_MS = 15000;
   // -----------------------------------------------------------------------
@@ -235,15 +236,25 @@
     botStatusEl.textContent = text;
   }
 
+  async function loadBridgeConfig() {
+    try {
+      const res = await fetch("bridge.json", { cache: "no-store" });
+      if (!res.ok) throw new Error("no bridge.json yet");
+      const data = await res.json();
+      BOT_BASE_URL = data.botBaseUrl || "";
+    } catch (err) {
+      BOT_BASE_URL = "";
+    }
+  }
+
   async function pollBotHealth() {
+    await loadBridgeConfig();
     if (!BOT_BASE_URL) {
       setBotStatus("offline", "○ Discord bot not set up");
       return;
     }
     try {
-      const res = await fetch(BOT_BASE_URL + "/health", {
-        headers: { "ngrok-skip-browser-warning": "true" },
-      });
+      const res = await fetch(BOT_BASE_URL + "/health");
       if (!res.ok) throw new Error("bad status " + res.status);
       const data = await res.json();
       if (data.connected) {
@@ -263,7 +274,6 @@
       headers: {
         "Content-Type": "application/json",
         "x-play-secret": BOT_SECRET,
-        "ngrok-skip-browser-warning": "true",
       },
       body: JSON.stringify({ sound: soundName }),
     })
