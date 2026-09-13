@@ -241,7 +241,9 @@
       return;
     }
     try {
-      const res = await fetch(BOT_BASE_URL + "/health");
+      const res = await fetch(BOT_BASE_URL + "/health", {
+        headers: { "ngrok-skip-browser-warning": "true" },
+      });
       if (!res.ok) throw new Error("bad status " + res.status);
       const data = await res.json();
       if (data.connected) {
@@ -261,6 +263,7 @@
       headers: {
         "Content-Type": "application/json",
         "x-play-secret": BOT_SECRET,
+        "ngrok-skip-browser-warning": "true",
       },
       body: JSON.stringify({ sound: soundName }),
     })
