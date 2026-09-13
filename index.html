@@ -186,6 +186,7 @@
 
   let SOUNDS = [];
   let activeAudios = [];
+  let bridgeConnected = false; // true only when the Discord bot is actually in a voice channel
 
   const grid = document.getElementById("grid");
   const emptyState = document.getElementById("emptyState");
@@ -206,25 +207,34 @@
   }
 
   function playSound(sound, tileEl) {
-    const audio = new Audio(sound.url);
-    audio.volume = currentVolume();
-    activeAudios.push(audio);
+    // If the Discord bot is actually in a voice channel, it'll play this sound
+    // there — playing it locally too would double it up for anyone who's both
+    // in the call and has this page open. So only play it in-browser as a
+    // fallback when there's no live bridge to Discord.
+    if (!bridgeConnected) {
+      const audio = new Audio(sound.url);
+      audio.volume = currentVolume();
+      activeAudios.push(audio);
 
-    tileEl.classList.add("playing");
-    const stopVisual = () => {
-      tileEl.classList.remove("playing");
-      activeAudios = activeAudios.filter(a => a !== audio);
-    };
-    audio.addEventListener("ended", stopVisual);
-    audio.addEventListener("error", () => {
-      stopVisual();
-      console.warn("Couldn't play " + sound.url);
-    });
+      tileEl.classList.add("playing");
+      const stopVisual = () => {
+        tileEl.classList.remove("playing");
+        activeAudios = activeAudios.filter(a => a !== audio);
+      };
+      audio.addEventListener("ended", stopVisual);
+      audio.addEventListener("error", () => {
+        stopVisual();
+        console.warn("Couldn't play " + sound.url);
+      });
 
-    audio.play().catch(err => {
-      stopVisual();
-      console.warn("Playback blocked or failed:", err);
-    });
+      audio.play().catch(err => {
+        stopVisual();
+        console.warn("Playback blocked or failed:", err);
+      });
+    } else {
+      tileEl.classList.add("playing");
+      setTimeout(() => tileEl.classList.remove("playing"), 500);
+    }
 
     triggerDiscordPlay(sound.name);
   }
@@ -250,6 +260,7 @@
   async function pollBotHealth() {
     await loadBridgeConfig();
     if (!BOT_BASE_URL) {
+      bridgeConnected = false;
       setBotStatus("offline", "○ Discord bot not set up");
       return;
     }
@@ -257,12 +268,14 @@
       const res = await fetch(BOT_BASE_URL + "/health");
       if (!res.ok) throw new Error("bad status " + res.status);
       const data = await res.json();
+      bridgeConnected = !!data.connected;
       if (data.connected) {
         setBotStatus("connected", "● Bot connected — tiles play in Discord too");
       } else {
         setBotStatus("idle", "● Bot online, but not in a voice channel (use /join)");
       }
     } catch (err) {
+      bridgeConnected = false;
       setBotStatus("offline", "○ Can't reach Discord bot");
     }
   }
