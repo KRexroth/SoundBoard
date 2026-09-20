@@ -26,6 +26,16 @@
   body { padding: 24px 16px 80px; }
   .wrap { width: 100%; margin: 0; }
 
+  .page-title {
+    width: 100%;
+    text-align: center;
+    margin: 0 0 20px;
+    font-size: 1.8rem;
+    font-weight: 800;
+    letter-spacing: 0.04em;
+    color: var(--text);
+  }
+
   .menu-bar {
     position: relative;
     display: inline-block;
@@ -54,6 +64,9 @@
     flex-direction: column;
     gap: 2px;
   }
+  .menu-item {
+    position: relative;
+  }
   .menu-item-btn {
     width: 100%;
     display: flex;
@@ -80,7 +93,27 @@
   .menu-item.open .flyout {
     display: block;
   }
+  /* On mouse-driven devices with enough room, show flyouts to the side
+     instead of stacked below — a flyout that's in-flow (the default rules
+     above) shoves the items below it down/up as it opens and closes, which
+     yanks the next item out from under the cursor while scrolling down
+     through the menu. Off to the side, opening/closing a flyout never moves
+     anything else, and it shares an unbroken edge with its button so the
+     cursor never has to cross a gap to reach it. */
+  @media (hover: hover) and (pointer: fine) and (min-width: 760px) {
+    .flyout {
+      position: absolute;
+      top: 0;
+      left: 100%;
+      margin: 0;
+      width: 260px;
+      max-width: min(320px, calc(100vw - 360px));
+      box-shadow: 0 12px 30px rgba(0,0,0,0.45);
+      z-index: 21;
+    }
+  }
   .flyout ol, .flyout ul { margin: 0; padding-left: 18px; }
+  .flyout ol, .flyout ul, .flyout li { word-wrap: break-word; }
   .flyout code { background: #10111a; padding: 1px 6px; border-radius: 5px; color: var(--text); }
   .flyout .plain-list { list-style: none; padding-left: 0; }
   .flyout .plain-list li { padding: 2px 0; color: var(--text); }
@@ -182,6 +215,7 @@
 </head>
 <body>
 <div class="wrap">
+  <h1 class="page-title">DISCORD SOUND BOARD</h1>
   <div class="menu-bar">
     <button type="button" id="menuToggle" class="menu-toggle" aria-label="Open menu" aria-expanded="false">☰</button>
 
@@ -395,9 +429,9 @@
       idleDeadline = data.idleDeadline || null;
       setStatusValue(statusRunningEl, "yes", "Running");
       if (data.connected) {
-        setStatusValue(statusActiveEl, "yes", "Yes — tiles play in Discord");
+        setStatusValue(statusActiveEl, "yes", "Yes");
       } else {
-        setStatusValue(statusActiveEl, "no", "No — use /join in Discord");
+        setStatusValue(statusActiveEl, "no", "No");
       }
       updateTimeLeftDisplay();
     } catch (err) {
