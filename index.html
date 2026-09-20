@@ -26,10 +26,17 @@
   body { padding: 24px 16px 80px; }
   .wrap { width: 100%; margin: 0; }
 
-  header { margin-bottom: 20px; }
-  h1 { font-size: 1.6rem; margin: 0 0 4px; }
-  .subtitle { color: var(--muted); font-size: 0.92rem; margin: 0; }
-  .subtitle code { background: #232633; padding: 1px 6px; border-radius: 5px; }
+  .top-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: stretch;
+    gap: 16px;
+    margin: 0 0 16px;
+  }
+  .top-row .panel-section {
+    flex: 1 1 320px;
+    margin: 0;
+  }
 
   .panel-section {
     background: var(--panel);
@@ -175,35 +182,32 @@
 </head>
 <body>
 <div class="wrap">
-  <header>
-    <h1>🔊 Friend Group Soundboard</h1>
-    <p class="subtitle">Click a tile to play it. The grid is built live from whatever's in the <code>Sounds</code> folder of the GitHub repo.</p>
-  </header>
+  <div class="top-row">
+    <section class="panel-section howto">
+      <h2>How to use this with Discord</h2>
+      <ol>
+        <li>The soundboard bot needs to be running on Kevin's computer — if it's not, tiles will only play locally in your own browser instead of in Discord.</li>
+        <li>Once it's running, type <code>/join</code> in a text channel in Discord while you're in the voice channel you want sound in.</li>
+        <li>Once the bot has joined, anyone with this page open can click a tile and it'll play for everyone in that voice channel.</li>
+      </ol>
+      <p class="servers">Works in: <strong id="serverList"></strong></p>
+    </section>
 
-  <section class="panel-section howto">
-    <h2>How to use this with Discord</h2>
-    <ol>
-      <li>The soundboard bot needs to be running on Kevin's computer — if it's not, tiles will only play locally in your own browser instead of in Discord.</li>
-      <li>Once it's running, type <code>/join</code> in a text channel in Discord while you're in the voice channel you want sound in.</li>
-      <li>Once the bot has joined, anyone with this page open can click a tile and it'll play for everyone in that voice channel.</li>
-    </ol>
-    <p class="servers">Works in: <strong id="serverList"></strong></p>
-  </section>
-
-  <section class="panel-section status-panel">
-    <div class="status-row">
-      <span class="status-label">Bot running</span>
-      <span id="statusRunning" class="status-value status-value--unknown">Checking…</span>
-    </div>
-    <div class="status-row">
-      <span class="status-label">Active in Discord</span>
-      <span id="statusActive" class="status-value status-value--unknown">Checking…</span>
-    </div>
-    <div class="status-row">
-      <span class="status-label">Auto-leaves in</span>
-      <span id="statusTimeLeft" class="status-value status-value--unknown">—</span>
-    </div>
-  </section>
+    <section class="panel-section status-panel">
+      <div class="status-row">
+        <span class="status-label">Bot running</span>
+        <span id="statusRunning" class="status-value status-value--unknown">Checking…</span>
+      </div>
+      <div class="status-row">
+        <span class="status-label">Active in Discord</span>
+        <span id="statusActive" class="status-value status-value--unknown">Checking…</span>
+      </div>
+      <div class="status-row">
+        <span class="status-label">Auto-leaves in</span>
+        <span id="statusTimeLeft" class="status-value status-value--unknown">—</span>
+      </div>
+    </section>
+  </div>
 
   <div class="toolbar">
     <label>Volume
