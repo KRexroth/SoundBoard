@@ -26,20 +26,54 @@
   body { padding: 24px 16px 80px; }
   .wrap { width: 100%; margin: 0; }
 
+  /* Title + hamburger menu normally share a line: the title is centered to
+     the full row width (independent of the menu's box) via absolute
+     positioning, while the menu sits in normal flow at the left. If a
+     resize (or a longer title someday) ever makes their rendered boxes
+     truly intersect, JS below adds .stacked, which drops the title back
+     into normal flow above the menu instead of letting them overlap. */
+  .header-row {
+    position: relative;
+    min-height: 44px;
+    margin: 0 0 16px;
+  }
+  .header-row.stacked {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+
   .page-title {
-    width: 100%;
-    text-align: center;
-    margin: 0 0 20px;
-    font-size: 1.8rem;
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    margin: 0;
+    max-width: calc(100vw - 32px);
+    font-size: clamp(1.4rem, 4vw, 2.1rem);
     font-weight: 800;
-    letter-spacing: 0.04em;
-    color: var(--text);
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    text-align: center;
+    background: linear-gradient(120deg, #7c5cff 0%, #a78bfa 45%, #22c55e 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    filter: drop-shadow(0 2px 16px rgba(124, 92, 255, 0.35));
+  }
+  .header-row.stacked .page-title {
+    position: static;
+    transform: none;
+    margin: 0 0 14px;
   }
 
   .menu-bar {
     position: relative;
     display: inline-block;
-    margin: 0 0 16px;
+    margin: 0;
+  }
+  .header-row.stacked .menu-bar {
+    margin: 0;
   }
   .menu-toggle {
     font-size: 1.25rem;
@@ -215,7 +249,8 @@
 </head>
 <body>
 <div class="wrap">
-  <h1 class="page-title">DISCORD SOUND BOARD</h1>
+  <div class="header-row" id="headerRow">
+  <h1 class="page-title" id="pageTitle">DISCORD SOUND BOARD</h1>
   <div class="menu-bar">
     <button type="button" id="menuToggle" class="menu-toggle" aria-label="Open menu" aria-expanded="false">☰</button>
 
@@ -278,6 +313,7 @@
         </div>
       </div>
     </div>
+  </div>
   </div>
 
   <div id="grid" class="grid"></div>
@@ -579,6 +615,38 @@
       closeMenu();
     }
   });
+
+  // ---- Title/menu collision check ------------------------------------------
+  // The title is centered across the whole row and the menu toggle sits at
+  // the left, independently of it — normally there's plenty of room for
+  // both. This just double-checks after layout (and on resize) that their
+  // actual rendered boxes don't intersect, and drops the menu onto its own
+  // line below the title if they ever do.
+
+  const headerRow = document.getElementById("headerRow");
+  const pageTitleEl = document.getElementById("pageTitle");
+
+  function boxesOverlap(a, b, buffer) {
+    return !(
+      a.right + buffer < b.left ||
+      a.left > b.right + buffer ||
+      a.bottom + buffer < b.top ||
+      a.top > b.bottom + buffer
+    );
+  }
+
+  function updateHeaderLayout() {
+    headerRow.classList.remove("stacked");
+    const titleRect = pageTitleEl.getBoundingClientRect();
+    const menuRect = menuToggleBtn.getBoundingClientRect();
+    if (boxesOverlap(titleRect, menuRect, 8)) {
+      headerRow.classList.add("stacked");
+    }
+  }
+
+  window.addEventListener("resize", updateHeaderLayout);
+  window.addEventListener("load", updateHeaderLayout);
+  updateHeaderLayout();
 
   renderServerList();
   loadSounds();
