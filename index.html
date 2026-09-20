@@ -33,8 +33,12 @@
     gap: 16px;
     margin: 0 0 16px;
   }
-  .top-row .panel-section {
-    flex: 1 1 320px;
+  .top-row .howto {
+    flex: 3 1 380px;
+    margin: 0;
+  }
+  .top-row .status-panel {
+    flex: 2 1 260px;
     margin: 0;
   }
 
@@ -70,6 +74,11 @@
 
   .status-panel {
     display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+  .status-rows {
+    display: flex;
     flex-wrap: wrap;
     gap: 18px;
   }
@@ -86,18 +95,16 @@
   .status-value--unknown { color: var(--muted); }
   .status-value--warn { color: #eab308; }
 
-  .toolbar {
+  .status-controls {
     display: flex;
     flex-wrap: wrap;
     align-items: center;
-    gap: 12px;
-    margin: 18px 0;
-    padding: 12px 14px;
-    background: var(--panel);
-    border-radius: 12px;
+    gap: 10px;
+    padding-top: 12px;
+    border-top: 1px solid rgba(255,255,255,0.06);
   }
-  .toolbar label { font-size: 0.85rem; color: var(--muted); display: flex; align-items: center; gap: 8px; }
-  .toolbar input[type="range"] { width: 140px; }
+  .status-controls label { font-size: 0.85rem; color: var(--muted); display: flex; align-items: center; gap: 8px; }
+  .status-controls input[type="range"] { width: 110px; }
   button {
     font: inherit;
     cursor: pointer;
@@ -112,7 +119,6 @@
   button:active { transform: scale(0.97); }
   .btn-danger { background: rgba(239,68,68,0.15); color: #ff8a8a; }
   .btn-danger:hover { background: rgba(239,68,68,0.28); }
-  .spacer { flex: 1; }
 
   .grid {
     display: grid;
@@ -171,13 +177,6 @@
   .error-state { color: #ff8a8a; }
   .error-state code, .empty-state code { background: #10111a; padding: 2px 6px; border-radius: 5px; }
   .hidden { display: none !important; }
-
-  footer {
-    margin-top: 40px;
-    color: var(--muted);
-    font-size: 0.8rem;
-    text-align: center;
-  }
 </style>
 </head>
 <body>
@@ -190,43 +189,42 @@
         <li>Once it's running, type <code>/join</code> in a text channel in Discord while you're in the voice channel you want sound in.</li>
         <li>Once the bot has joined, anyone with this page open can click a tile and it'll play for everyone in that voice channel.</li>
       </ol>
-      <p class="servers">Works in: <strong id="serverList"></strong></p>
     </section>
 
     <section class="panel-section status-panel">
-      <div class="status-row">
-        <span class="status-label">Bot running</span>
-        <span id="statusRunning" class="status-value status-value--unknown">Checking…</span>
+      <h2>Status</h2>
+      <div class="status-rows">
+        <div class="status-row">
+          <span class="status-label">Bot running</span>
+          <span id="statusRunning" class="status-value status-value--unknown">Checking…</span>
+        </div>
+        <div class="status-row">
+          <span class="status-label">Active in Discord</span>
+          <span id="statusActive" class="status-value status-value--unknown">Checking…</span>
+        </div>
+        <div class="status-row">
+          <span class="status-label">Auto-leaves in</span>
+          <span id="statusTimeLeft" class="status-value status-value--unknown">—</span>
+        </div>
       </div>
-      <div class="status-row">
-        <span class="status-label">Active in Discord</span>
-        <span id="statusActive" class="status-value status-value--unknown">Checking…</span>
-      </div>
-      <div class="status-row">
-        <span class="status-label">Auto-leaves in</span>
-        <span id="statusTimeLeft" class="status-value status-value--unknown">—</span>
+      <p class="servers">Works in: <strong id="serverList"></strong></p>
+      <div class="status-controls">
+        <label>Volume
+          <input type="range" id="volumeSlider" min="0" max="1" step="0.01" value="0.8" />
+        </label>
+        <button id="refreshBtn">↻ Refresh</button>
+        <button id="stopAllBtn" class="btn-danger">⏹ Stop All</button>
       </div>
     </section>
-  </div>
-
-  <div class="toolbar">
-    <label>Volume
-      <input type="range" id="volumeSlider" min="0" max="1" step="0.01" value="0.8" />
-    </label>
-    <div class="spacer"></div>
-    <button id="refreshBtn">↻ Refresh</button>
-    <button id="stopAllBtn" class="btn-danger">⏹ Stop All</button>
   </div>
 
   <div id="grid" class="grid"></div>
   <div id="emptyState" class="empty-state hidden">No sounds in the <code>Sounds</code> folder yet.</div>
   <div id="errorState" class="error-state hidden"></div>
-
-  <footer>Sounds are managed directly on GitHub — nothing to upload here.</footer>
 </div>
 
 <script>
-  // ---- Configure this for your repo -----------------------------------
+  // ---- Configure this for your repo ------------------------------------
   const GITHUB_OWNER = "KRexroth";
   const GITHUB_REPO = "SoundBoard";
   const GITHUB_BRANCH = "main";
@@ -311,7 +309,7 @@
     triggerDiscordPlay(sound.name);
   }
 
-  // ---- Discord bot bridge --------------------------------------------------
+  // ---- Discord bot bridge -------------------------------------------------
 
   function setStatusValue(el, state, text) {
     el.className = "status-value status-value--" + state;
