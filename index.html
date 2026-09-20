@@ -26,70 +26,83 @@
   body { padding: 24px 16px 80px; }
   .wrap { width: 100%; margin: 0; }
 
-  .top-row {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: stretch;
-    gap: 16px;
+  .menu-bar {
+    position: relative;
+    display: inline-block;
     margin: 0 0 16px;
   }
-  .top-row .howto {
-    flex: 3 1 380px;
-    margin: 0;
+  .menu-toggle {
+    font-size: 1.25rem;
+    line-height: 1;
+    padding: 10px 16px;
   }
-  .top-row .status-panel {
-    flex: 2 1 260px;
-    margin: 0;
-  }
-
-  .panel-section {
+  .menu-panel {
+    position: absolute;
+    top: calc(100% + 8px);
+    left: 0;
+    z-index: 20;
+    width: 300px;
+    max-width: calc(100vw - 32px);
     background: var(--panel);
     border-radius: 12px;
-    padding: 16px 18px;
-    margin: 16px 0;
+    padding: 8px;
+    box-shadow: 0 12px 30px rgba(0,0,0,0.45);
   }
-  .panel-section h2 {
-    font-size: 0.95rem;
-    margin: 0 0 10px;
-    color: var(--text);
-  }
-  .howto ol {
-    margin: 0;
-    padding-left: 20px;
-    color: var(--muted);
-    font-size: 0.9rem;
-    line-height: 1.6;
-  }
-  .howto li { margin-bottom: 4px; }
-  .howto li:last-child { margin-bottom: 0; }
-  .howto code { background: #10111a; padding: 1px 6px; border-radius: 5px; color: var(--text); }
-  .servers {
-    margin: 12px 0 0;
-    padding-top: 12px;
-    border-top: 1px solid rgba(255,255,255,0.06);
-    font-size: 0.88rem;
-    color: var(--muted);
-  }
-  .servers strong { color: var(--text); }
-
-  .status-panel {
-    display: flex;
-    flex-direction: column;
-    gap: 14px;
-  }
-  .status-rows {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 18px;
-  }
-  .status-row {
+  .menu-panel.hidden { display: none !important; }
+  .menu-nav {
     display: flex;
     flex-direction: column;
     gap: 2px;
-    min-width: 140px;
+  }
+  .menu-item-btn {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: transparent;
+    padding: 10px 12px;
+  }
+  .menu-item-btn:hover { background: var(--panel-2); }
+  .menu-caret { color: var(--muted); font-size: 0.8rem; transition: transform 0.15s ease; }
+  .menu-item.open .menu-caret { transform: rotate(90deg); }
+
+  .flyout {
+    display: none;
+    background: var(--panel-2);
+    border-radius: 8px;
+    padding: 10px 12px;
+    margin: 4px 0 8px;
+    font-size: 0.85rem;
+    color: var(--muted);
+    line-height: 1.6;
+  }
+  .menu-item:hover .flyout,
+  .menu-item.open .flyout {
+    display: block;
+  }
+  .flyout ol, .flyout ul { margin: 0; padding-left: 18px; }
+  .flyout code { background: #10111a; padding: 1px 6px; border-radius: 5px; color: var(--text); }
+  .flyout .plain-list { list-style: none; padding-left: 0; }
+  .flyout .plain-list li { padding: 2px 0; color: var(--text); }
+  .command-list li { margin-bottom: 6px; }
+  .command-list li:last-child { margin-bottom: 0; }
+
+  .menu-status {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    border-top: 1px solid rgba(255,255,255,0.08);
+    margin-top: 4px;
+    padding: 10px 12px 6px;
+  }
+  .status-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
   }
   .status-label { font-size: 0.75rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.03em; }
-  .status-value { font-size: 1rem; font-weight: 600; }
+  .status-value { font-size: 0.9rem; font-weight: 600; }
   .status-value--yes { color: #7CFC9E; }
   .status-value--no { color: var(--muted); }
   .status-value--unknown { color: var(--muted); }
@@ -169,19 +182,54 @@
 </head>
 <body>
 <div class="wrap">
-  <div class="top-row">
-    <section class="panel-section howto">
-      <h2>How to use this with Discord</h2>
-      <ol>
-        <li>The soundboard bot needs to be running on Kevin's computer — if it's not, tiles will only play locally in your own browser instead of in Discord.</li>
-        <li>Once it's running, type <code>/join</code> in a text channel in Discord while you're in the voice channel you want sound in.</li>
-        <li>Once the bot has joined, anyone with this page open can click a tile and it'll play for everyone in that voice channel.</li>
-      </ol>
-    </section>
+  <div class="menu-bar">
+    <button type="button" id="menuToggle" class="menu-toggle" aria-label="Open menu" aria-expanded="false">☰</button>
 
-    <section class="panel-section status-panel">
-      <h2>Status</h2>
-      <div class="status-rows">
+    <div id="menuPanel" class="menu-panel hidden">
+      <nav class="menu-nav">
+        <div class="menu-item">
+          <button type="button" class="menu-item-btn">
+            <span>Instructions</span>
+            <span class="menu-caret">›</span>
+          </button>
+          <div class="flyout">
+            <ol>
+              <li>The soundboard bot needs to be running on Kevin's computer — if it's not, tiles will only play locally in your own browser instead of in Discord.</li>
+              <li>Once it's running, type <code>/join</code> in a text channel in Discord while you're in the voice channel you want sound in.</li>
+              <li>Once the bot has joined, anyone with this page open can click a tile and it'll play for everyone in that voice channel.</li>
+            </ol>
+          </div>
+        </div>
+
+        <div class="menu-item">
+          <button type="button" class="menu-item-btn">
+            <span>Eligible Discords</span>
+            <span class="menu-caret">›</span>
+          </button>
+          <div class="flyout">
+            <ul id="serverListMenu" class="plain-list"></ul>
+          </div>
+        </div>
+
+        <div class="menu-item">
+          <button type="button" class="menu-item-btn">
+            <span>Commands</span>
+            <span class="menu-caret">›</span>
+          </button>
+          <div class="flyout">
+            <ul class="command-list">
+              <li><code>/play &lt;sound&gt;</code> — Plays a sound in your voice channel (autocompletes as you type).</li>
+              <li><code>/list</code> — Shows every sound currently available.</li>
+              <li><code>/refresh</code> — Reloads the sound list from GitHub immediately.</li>
+              <li><code>/stop</code> — Stops whatever's currently playing.</li>
+              <li><code>/join</code> — Brings the bot into your voice channel without playing anything.</li>
+              <li><code>/leave</code> — Disconnects the bot from voice.</li>
+            </ul>
+          </div>
+        </div>
+      </nav>
+
+      <div class="menu-status">
         <div class="status-row">
           <span class="status-label">Bot running</span>
           <span id="statusRunning" class="status-value status-value--unknown">Checking…</span>
@@ -195,8 +243,7 @@
           <span id="statusTimeLeft" class="status-value status-value--unknown">—</span>
         </div>
       </div>
-      <p class="servers">Works in: <strong id="serverList"></strong></p>
-    </section>
+    </div>
   </div>
 
   <div id="grid" class="grid"></div>
@@ -241,7 +288,7 @@
   const statusRunningEl = document.getElementById("statusRunning");
   const statusActiveEl = document.getElementById("statusActive");
   const statusTimeLeftEl = document.getElementById("statusTimeLeft");
-  const serverListEl = document.getElementById("serverList");
+  const serverListMenuEl = document.getElementById("serverListMenu");
 
   function humanize(filename) {
     const stem = filename.replace(/\.[^/.]+$/, "");
@@ -295,7 +342,13 @@
   }
 
   function renderServerList() {
-    serverListEl.textContent = DISCORD_SERVERS.length ? DISCORD_SERVERS.join(", ") : "none configured yet";
+    serverListMenuEl.innerHTML = "";
+    const names = DISCORD_SERVERS.length ? DISCORD_SERVERS : ["None configured yet"];
+    names.forEach(name => {
+      const li = document.createElement("li");
+      li.textContent = name;
+      serverListMenuEl.appendChild(li);
+    });
   }
 
   function updateTimeLeftDisplay() {
@@ -444,6 +497,52 @@
     if (idx !== -1) {
       const tileEl = grid.children[idx];
       if (tileEl) playSound(SOUNDS[idx], tileEl);
+    }
+  });
+
+  // ---- Hamburger menu ------------------------------------------------------
+
+  const menuToggleBtn = document.getElementById("menuToggle");
+  const menuPanel = document.getElementById("menuPanel");
+  const menuItems = Array.from(document.querySelectorAll(".menu-item"));
+
+  function closeAllFlyouts() {
+    menuItems.forEach(item => item.classList.remove("open"));
+  }
+
+  function closeMenu() {
+    menuPanel.classList.add("hidden");
+    menuToggleBtn.setAttribute("aria-expanded", "false");
+    closeAllFlyouts();
+  }
+
+  function toggleMenu() {
+    if (menuPanel.classList.contains("hidden")) {
+      menuPanel.classList.remove("hidden");
+      menuToggleBtn.setAttribute("aria-expanded", "true");
+    } else {
+      closeMenu();
+    }
+  }
+
+  menuToggleBtn.addEventListener("click", (e) => {
+    e.stopPropagation();
+    toggleMenu();
+  });
+
+  menuItems.forEach(item => {
+    const btn = item.querySelector(".menu-item-btn");
+    btn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      const wasOpen = item.classList.contains("open");
+      closeAllFlyouts();
+      if (!wasOpen) item.classList.add("open");
+    });
+  });
+
+  document.addEventListener("click", (e) => {
+    if (!menuPanel.contains(e.target) && e.target !== menuToggleBtn) {
+      closeMenu();
     }
   });
 
