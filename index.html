@@ -24,12 +24,60 @@
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   }
   body { padding: 24px 16px 80px; }
-  .wrap { max-width: 980px; margin: 0 auto; }
+  .wrap { width: 100%; margin: 0; }
 
   header { margin-bottom: 20px; }
   h1 { font-size: 1.6rem; margin: 0 0 4px; }
   .subtitle { color: var(--muted); font-size: 0.92rem; margin: 0; }
   .subtitle code { background: #232633; padding: 1px 6px; border-radius: 5px; }
+
+  .panel-section {
+    background: var(--panel);
+    border-radius: 12px;
+    padding: 16px 18px;
+    margin: 16px 0;
+  }
+  .panel-section h2 {
+    font-size: 0.95rem;
+    margin: 0 0 10px;
+    color: var(--text);
+  }
+  .howto ol {
+    margin: 0;
+    padding-left: 20px;
+    color: var(--muted);
+    font-size: 0.9rem;
+    line-height: 1.6;
+  }
+  .howto li { margin-bottom: 4px; }
+  .howto li:last-child { margin-bottom: 0; }
+  .howto code { background: #10111a; padding: 1px 6px; border-radius: 5px; color: var(--text); }
+  .servers {
+    margin: 12px 0 0;
+    padding-top: 12px;
+    border-top: 1px solid rgba(255,255,255,0.06);
+    font-size: 0.88rem;
+    color: var(--muted);
+  }
+  .servers strong { color: var(--text); }
+
+  .status-panel {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 18px;
+  }
+  .status-row {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 140px;
+  }
+  .status-label { font-size: 0.75rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.03em; }
+  .status-value { font-size: 1rem; font-weight: 600; }
+  .status-value--yes { color: #7CFC9E; }
+  .status-value--no { color: var(--muted); }
+  .status-value--unknown { color: var(--muted); }
+  .status-value--warn { color: #eab308; }
 
   .toolbar {
     display: flex;
@@ -117,18 +165,6 @@
   .error-state code, .empty-state code { background: #10111a; padding: 2px 6px; border-radius: 5px; }
   .hidden { display: none !important; }
 
-  .bot-status {
-    font-size: 0.8rem;
-    padding: 5px 10px;
-    border-radius: 999px;
-    background: #232633;
-    white-space: nowrap;
-  }
-  .bot-status--unknown { color: var(--muted); }
-  .bot-status--connected { color: #7CFC9E; background: rgba(34,197,94,0.15); }
-  .bot-status--idle { color: #eab308; background: rgba(234,179,8,0.15); }
-  .bot-status--offline { color: var(--muted); background: rgba(146,152,172,0.12); }
-
   footer {
     margin-top: 40px;
     color: var(--muted);
@@ -144,11 +180,35 @@
     <p class="subtitle">Click a tile to play it. The grid is built live from whatever's in the <code>Sounds</code> folder of the GitHub repo.</p>
   </header>
 
+  <section class="panel-section howto">
+    <h2>How to use this with Discord</h2>
+    <ol>
+      <li>The soundboard bot needs to be running on Kevin's computer — if it's not, tiles will only play locally in your own browser instead of in Discord.</li>
+      <li>Once it's running, type <code>/join</code> in a text channel in Discord while you're in the voice channel you want sound in.</li>
+      <li>Once the bot has joined, anyone with this page open can click a tile and it'll play for everyone in that voice channel.</li>
+    </ol>
+    <p class="servers">Works in: <strong id="serverList"></strong></p>
+  </section>
+
+  <section class="panel-section status-panel">
+    <div class="status-row">
+      <span class="status-label">Bot running</span>
+      <span id="statusRunning" class="status-value status-value--unknown">Checking…</span>
+    </div>
+    <div class="status-row">
+      <span class="status-label">Active in Discord</span>
+      <span id="statusActive" class="status-value status-value--unknown">Checking…</span>
+    </div>
+    <div class="status-row">
+      <span class="status-label">Auto-leaves in</span>
+      <span id="statusTimeLeft" class="status-value status-value--unknown">—</span>
+    </div>
+  </section>
+
   <div class="toolbar">
     <label>Volume
       <input type="range" id="volumeSlider" min="0" max="1" step="0.01" value="0.8" />
     </label>
-    <span id="botStatus" class="bot-status bot-status--unknown">● Checking Discord bot…</span>
     <div class="spacer"></div>
     <button id="refreshBtn">↻ Refresh</button>
     <button id="stopAllBtn" class="btn-danger">⏹ Stop All</button>
@@ -180,6 +240,10 @@
   const BOT_HEALTH_POLL_MS = 15000;
   // -----------------------------------------------------------------------
 
+  // Discord servers this soundboard is set up to work in — just for display,
+  // add another name here whenever the bot gets invited somewhere new.
+  const DISCORD_SERVERS = ["YMAC Therapy Session"];
+
   const KEY_ORDER = "1234567890qwertyuiopasdfghjklzxcvbnm".split("");
   const PALETTE = ["#7c5cff", "#22c55e", "#ef4444", "#eab308", "#06b6d4", "#f97316", "#ec4899", "#8b5cf6", "#10b981"];
   const AUDIO_EXTS = new Set(["mp3", "wav", "ogg", "m4a", "flac"]);
@@ -187,6 +251,7 @@
   let SOUNDS = [];
   let activeAudios = [];
   let bridgeConnected = false; // true only when the Discord bot is actually in a voice channel
+  let idleDeadline = null; // ms-since-epoch when the bot will auto-leave, or null
 
   const grid = document.getElementById("grid");
   const emptyState = document.getElementById("emptyState");
@@ -194,7 +259,10 @@
   const volumeSlider = document.getElementById("volumeSlider");
   const stopAllBtn = document.getElementById("stopAllBtn");
   const refreshBtn = document.getElementById("refreshBtn");
-  const botStatusEl = document.getElementById("botStatus");
+  const statusRunningEl = document.getElementById("statusRunning");
+  const statusActiveEl = document.getElementById("statusActive");
+  const statusTimeLeftEl = document.getElementById("statusTimeLeft");
+  const serverListEl = document.getElementById("serverList");
 
   function currentVolume() {
     return parseFloat(volumeSlider.value);
@@ -241,9 +309,38 @@
 
   // ---- Discord bot bridge --------------------------------------------------
 
-  function setBotStatus(state, text) {
-    botStatusEl.className = "bot-status bot-status--" + state;
-    botStatusEl.textContent = text;
+  function setStatusValue(el, state, text) {
+    el.className = "status-value status-value--" + state;
+    el.textContent = text;
+  }
+
+  function formatDuration(ms) {
+    if (ms <= 0) return "0:00";
+    const totalSeconds = Math.floor(ms / 1000);
+    const h = Math.floor(totalSeconds / 3600);
+    const m = Math.floor((totalSeconds % 3600) / 60);
+    const s = totalSeconds % 60;
+    if (h > 0) return `${h}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
+    return `${m}:${String(s).padStart(2, "0")}`;
+  }
+
+  function renderServerList() {
+    serverListEl.textContent = DISCORD_SERVERS.length ? DISCORD_SERVERS.join(", ") : "none configured yet";
+  }
+
+  function updateTimeLeftDisplay() {
+    if (!bridgeConnected || !idleDeadline) {
+      setStatusValue(statusTimeLeftEl, "unknown", "—");
+      return;
+    }
+    const remaining = idleDeadline - Date.now();
+    if (remaining <= 0) {
+      setStatusValue(statusTimeLeftEl, "unknown", "—");
+      return;
+    }
+    // Warn once under 10 minutes are left, same as the rest of the "about to expire" UI.
+    const state = remaining < 10 * 60 * 1000 ? "warn" : "yes";
+    setStatusValue(statusTimeLeftEl, state, formatDuration(remaining));
   }
 
   async function loadBridgeConfig() {
@@ -261,7 +358,10 @@
     await loadBridgeConfig();
     if (!BOT_BASE_URL) {
       bridgeConnected = false;
-      setBotStatus("offline", "○ Discord bot not set up");
+      idleDeadline = null;
+      setStatusValue(statusRunningEl, "no", "Not running");
+      setStatusValue(statusActiveEl, "unknown", "—");
+      updateTimeLeftDisplay();
       return;
     }
     try {
@@ -269,14 +369,20 @@
       if (!res.ok) throw new Error("bad status " + res.status);
       const data = await res.json();
       bridgeConnected = !!data.connected;
+      idleDeadline = data.idleDeadline || null;
+      setStatusValue(statusRunningEl, "yes", "Running");
       if (data.connected) {
-        setBotStatus("connected", "● Bot connected — tiles play in Discord too");
+        setStatusValue(statusActiveEl, "yes", "Yes — tiles play in Discord");
       } else {
-        setBotStatus("idle", "● Bot online, but not in a voice channel (use /join)");
+        setStatusValue(statusActiveEl, "no", "No — use /join in Discord");
       }
+      updateTimeLeftDisplay();
     } catch (err) {
       bridgeConnected = false;
-      setBotStatus("offline", "○ Can't reach Discord bot");
+      idleDeadline = null;
+      setStatusValue(statusRunningEl, "no", "Can't reach it");
+      setStatusValue(statusActiveEl, "unknown", "—");
+      updateTimeLeftDisplay();
     }
   }
 
@@ -381,9 +487,11 @@
   stopAllBtn.addEventListener("click", stopAll);
   refreshBtn.addEventListener("click", loadSounds);
 
+  renderServerList();
   loadSounds();
   pollBotHealth();
   setInterval(pollBotHealth, BOT_HEALTH_POLL_MS);
+  setInterval(updateTimeLeftDisplay, 1000); // ticks the countdown between health polls
 </script>
 </body>
 </html>
