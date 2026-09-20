@@ -95,16 +95,6 @@
   .status-value--unknown { color: var(--muted); }
   .status-value--warn { color: #eab308; }
 
-  .status-controls {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 10px;
-    padding-top: 12px;
-    border-top: 1px solid rgba(255,255,255,0.06);
-  }
-  .status-controls label { font-size: 0.85rem; color: var(--muted); display: flex; align-items: center; gap: 8px; }
-  .status-controls input[type="range"] { width: 110px; }
   button {
     font: inherit;
     cursor: pointer;
@@ -117,8 +107,6 @@
   }
   button:hover { background: #2b2f40; }
   button:active { transform: scale(0.97); }
-  .btn-danger { background: rgba(239,68,68,0.15); color: #ff8a8a; }
-  .btn-danger:hover { background: rgba(239,68,68,0.28); }
 
   .grid {
     display: grid;
@@ -208,13 +196,6 @@
         </div>
       </div>
       <p class="servers">Works in: <strong id="serverList"></strong></p>
-      <div class="status-controls">
-        <label>Volume
-          <input type="range" id="volumeSlider" min="0" max="1" step="0.01" value="0.8" />
-        </label>
-        <button id="refreshBtn">↻ Refresh</button>
-        <button id="stopAllBtn" class="btn-danger">⏹ Stop All</button>
-      </div>
     </section>
   </div>
 
@@ -224,7 +205,7 @@
 </div>
 
 <script>
-  // ---- Configure this for your repo ------------------------------------
+  // ---- Configure this for your repo -----------------------------------
   const GITHUB_OWNER = "KRexroth";
   const GITHUB_REPO = "SoundBoard";
   const GITHUB_BRANCH = "main";
@@ -251,24 +232,16 @@
   const AUDIO_EXTS = new Set(["mp3", "wav", "ogg", "m4a", "flac"]);
 
   let SOUNDS = [];
-  let activeAudios = [];
   let bridgeConnected = false; // true only when the Discord bot is actually in a voice channel
   let idleDeadline = null; // ms-since-epoch when the bot will auto-leave, or null
 
   const grid = document.getElementById("grid");
   const emptyState = document.getElementById("emptyState");
   const errorState = document.getElementById("errorState");
-  const volumeSlider = document.getElementById("volumeSlider");
-  const stopAllBtn = document.getElementById("stopAllBtn");
-  const refreshBtn = document.getElementById("refreshBtn");
   const statusRunningEl = document.getElementById("statusRunning");
   const statusActiveEl = document.getElementById("statusActive");
   const statusTimeLeftEl = document.getElementById("statusTimeLeft");
   const serverListEl = document.getElementById("serverList");
-
-  function currentVolume() {
-    return parseFloat(volumeSlider.value);
-  }
 
   function humanize(filename) {
     const stem = filename.replace(/\.[^/.]+$/, "");
@@ -283,14 +256,9 @@
     // fallback when there's no live bridge to Discord.
     if (!bridgeConnected) {
       const audio = new Audio(sound.url);
-      audio.volume = currentVolume();
-      activeAudios.push(audio);
 
       tileEl.classList.add("playing");
-      const stopVisual = () => {
-        tileEl.classList.remove("playing");
-        activeAudios = activeAudios.filter(a => a !== audio);
-      };
+      const stopVisual = () => tileEl.classList.remove("playing");
       audio.addEventListener("ended", stopVisual);
       audio.addEventListener("error", () => {
         stopVisual();
@@ -309,7 +277,7 @@
     triggerDiscordPlay(sound.name);
   }
 
-  // ---- Discord bot bridge -------------------------------------------------
+  // ---- Discord bot bridge --------------------------------------------------
 
   function setStatusValue(el, state, text) {
     el.className = "status-value status-value--" + state;
@@ -407,12 +375,6 @@
       .catch(err => console.warn("Couldn't reach Discord bot:", err));
   }
 
-  function stopAll() {
-    activeAudios.forEach(a => { a.pause(); a.currentTime = 0; });
-    activeAudios = [];
-    document.querySelectorAll(".tile.playing").forEach(t => t.classList.remove("playing"));
-  }
-
   function renderGrid() {
     grid.innerHTML = "";
     if (SOUNDS.length === 0) {
@@ -468,7 +430,7 @@
       errorState.classList.remove("hidden");
       errorState.innerHTML =
         "Couldn't load the sound list from GitHub.<br>" +
-        "If you just added sounds, GitHub's API is occasionally a few seconds behind — try Refresh. " +
+        "If you just added sounds, GitHub's API is occasionally a few seconds behind — try reloading the page. " +
         "Otherwise check that the repo is public and the <code>" + SOUNDS_FOLDER + "</code> folder exists.";
       console.warn("Failed to load sounds:", err);
     }
@@ -477,7 +439,6 @@
   document.addEventListener("keydown", (e) => {
     const tag = (e.target && e.target.tagName) || "";
     if (tag === "INPUT" || tag === "TEXTAREA") return;
-    if (e.key === "Escape") { stopAll(); return; }
 
     const idx = SOUNDS.findIndex(s => s._key === e.key.toLowerCase());
     if (idx !== -1) {
@@ -485,9 +446,6 @@
       if (tileEl) playSound(SOUNDS[idx], tileEl);
     }
   });
-
-  stopAllBtn.addEventListener("click", stopAll);
-  refreshBtn.addEventListener("click", loadSounds);
 
   renderServerList();
   loadSounds();
