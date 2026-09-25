@@ -249,6 +249,7 @@
   .add-sound-row {
     display: flex;
     justify-content: center;
+    gap: 12px;
     margin: 0 0 20px;
   }
   .add-sound-btn {
@@ -258,6 +259,13 @@
     padding: 10px 18px;
   }
   .add-sound-btn:hover { background: #6a4ce0; }
+  .stop-btn {
+    background: var(--danger);
+    color: white;
+    font-weight: 700;
+    padding: 10px 18px;
+  }
+  .stop-btn:hover { background: #d63c3c; }
 
   .modal-overlay {
     position: fixed;
@@ -368,6 +376,7 @@
   </div>
 
   <div class="add-sound-row">
+    <button type="button" id="stopBtn" class="stop-btn">⏹ Stop</button>
     <button type="button" id="addSoundBtn" class="add-sound-btn">+ Add A Sound</button>
   </div>
 
@@ -425,6 +434,7 @@
   let SOUNDS = [];
   let bridgeConnected = false; // true only when the Discord bot is actually in a voice channel
   let idleDeadline = null; // ms-since-epoch when the bot will auto-leave, or null
+  let currentLocalAudio = null; // the Audio() object currently playing locally in this browser, if any
 
   const grid = document.getElementById("grid");
   const emptyState = document.getElementById("emptyState");
@@ -433,6 +443,7 @@
   const statusActiveEl = document.getElementById("statusActive");
   const statusTimeLeftEl = document.getElementById("statusTimeLeft");
   const serverListMenuEl = document.getElementById("serverListMenu");
+  const stopBtn = document.getElementById("stopBtn");
 
   function humanize(filename) {
     const stem = filename.replace(/\.[^/.]+$/, "");
@@ -447,9 +458,13 @@
     // fallback when there's no live bridge to Discord.
     if (!bridgeConnected) {
       const audio = new Audio(sound.url);
+      currentLocalAudio = audio;
 
       tileEl.classList.add("playing");
-      const stopVisual = () => tileEl.classList.remove("playing");
+      const stopVisual = () => {
+        tileEl.classList.remove("playing");
+        if (currentLocalAudio === audio) currentLocalAudio = null;
+      };
       audio.addEventListener("ended", stopVisual);
       audio.addEventListener("error", () => {
         stopVisual();
@@ -467,6 +482,27 @@
 
     triggerDiscordPlay(sound.name);
   }
+
+  function stopAllPlayback() {
+    // Stop this browser's own local fallback playback, if any.
+    if (currentLocalAudio) {
+      currentLocalAudio.pause();
+      currentLocalAudio = null;
+    }
+    // Clear the playing pulse on every tile, regardless of who started it.
+    Array.from(grid.children).forEach(tile => tile.classList.remove("playing"));
+
+    // Tell the bot to stop whatever it's playing in Discord — this reaches
+    // everyone in the voice channel, even if someone else started the sound.
+    if (BOT_BASE_URL) {
+      fetch(BOT_BASE_URL + "/stop", {
+        method: "POST",
+        headers: { "x-play-secret": BOT_SECRET },
+      }).catch(err => console.warn("Couldn't reach Discord bot to stop:", err));
+    }
+  }
+
+  stopBtn.addEventListener("click", stopAllPlayback);
 
   // ---- Discord bot bridge --------------------------------------------------
 
