@@ -458,6 +458,10 @@
     // fallback when there's no live bridge to Discord.
     if (!bridgeConnected) {
       const audio = new Audio(sound.url);
+      // HTML5 audio volume can only attenuate (max 1.0), so a naturally quiet
+      // clip still plays at its recorded level locally — Discord playback can
+      // also amplify quiet clips, via the bot's own volume control.
+      audio.volume = Math.min(1, sound.gain || 1);
       currentLocalAudio = audio;
 
       tileEl.classList.add("playing");
@@ -637,10 +641,26 @@
     });
   }
 
+  async function fetchVolumes() {
+    // Best-effort: per-sound gain for balancing loud/quiet clips. Missing or
+    // unreachable just means everything plays at its natural volume locally.
+    try {
+      const res = await fetch(`https://raw.githubusercontent.com/${GITHUB_OWNER}/${GITHUB_REPO}/${GITHUB_BRANCH}/volumes.json`);
+      if (!res.ok) return {};
+      return await res.json();
+    } catch (err) {
+      console.warn("Couldn't load volumes.json:", err);
+      return {};
+    }
+  }
+
   async function loadSounds() {
     const apiUrl = `https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}/contents/${encodeURIComponent(SOUNDS_FOLDER)}?ref=${GITHUB_BRANCH}`;
     try {
-      const res = await fetch(apiUrl, { headers: { Accept: "application/vnd.github+json" } });
+      const [res, volumes] = await Promise.all([
+        fetch(apiUrl, { headers: { Accept: "application/vnd.github+json" } }),
+        fetchVolumes(),
+      ]);
       if (res.status === 404) {
         SOUNDS = [];
         errorState.classList.add("hidden");
@@ -653,7 +673,7 @@
       SOUNDS = entries
         .filter(e => e.type === "file" && AUDIO_EXTS.has((e.name.split(".").pop() || "").toLowerCase()))
         .sort((a, b) => a.name.localeCompare(b.name))
-        .map(e => ({ name: humanize(e.name), url: e.download_url }));
+        .map(e => ({ name: humanize(e.name), url: e.download_url, gain: volumes[e.name] || 1 }));
 
       errorState.classList.add("hidden");
       renderGrid();
