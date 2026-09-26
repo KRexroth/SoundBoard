@@ -223,6 +223,51 @@
     from { filter: brightness(1); }
     to { filter: brightness(1.18); }
   }
+
+  .folder-section {
+    margin: 0 0 14px;
+  }
+  .folder-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    background: var(--panel);
+    border-radius: 12px;
+    padding: 12px 16px;
+    cursor: pointer;
+    font-weight: 700;
+    font-size: 1rem;
+    color: var(--text, #fff);
+    text-align: left;
+  }
+  .folder-header:hover { background: #262a3a; }
+  .folder-caret {
+    display: inline-block;
+    transition: transform 0.15s ease;
+    font-size: 0.75rem;
+    color: var(--muted);
+  }
+  .folder-section.open .folder-caret {
+    transform: rotate(90deg);
+  }
+  .folder-name {
+    flex: 1;
+  }
+  .folder-count {
+    color: var(--muted);
+    font-weight: 500;
+    font-size: 0.85rem;
+  }
+  .folder-grid {
+    display: none;
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    gap: 14px;
+    margin: 14px 0 0;
+  }
+  .folder-section.open .folder-grid {
+    display: grid;
+  }
   .key-badge {
     position: absolute;
     top: 6px;
@@ -381,6 +426,7 @@
   </div>
 
   <div id="grid" class="grid"></div>
+  <div id="folderSections"></div>
   <div id="emptyState" class="empty-state hidden">No sounds in the <code>Sounds</code> folder yet.</div>
   <div id="errorState" class="error-state hidden"></div>
 </div>
@@ -395,6 +441,11 @@
     <div class="field">
       <label for="soundNameInput">Name (what shows on the tile)</label>
       <input type="text" id="soundNameInput" placeholder="e.g. Oh No" maxlength="60" />
+    </div>
+    <div class="field">
+      <label for="soundFolderInput">Folder (optional)</label>
+      <input type="text" id="soundFolderInput" list="folderDatalist" placeholder="e.g. Call of Duty — leave blank for none" maxlength="60" />
+      <datalist id="folderDatalist"></datalist>
     </div>
     <div id="addSoundStatus" class="modal-status hidden"></div>
     <div class="modal-actions">
@@ -436,7 +487,21 @@
   let idleDeadline = null; // ms-since-epoch when the bot will auto-leave, or null
   let currentLocalAudio = null; // the Audio() object currently playing locally in this browser, if any
 
+  // Which folders are expanded, remembered per-browser so it doesn't reset on
+  // every reload. Falls back to "all collapsed" if storage isn't available.
+  let folderOpenState = {};
+  try {
+    folderOpenState = JSON.parse(localStorage.getItem("soundboard-open-folders") || "{}");
+  } catch { folderOpenState = {}; }
+
+  function saveFolderOpenState() {
+    try {
+      localStorage.setItem("soundboard-open-folders", JSON.stringify(folderOpenState));
+    } catch {}
+  }
+
   const grid = document.getElementById("grid");
+  const folderSections = document.getElementById("folderSections");
   const emptyState = document.getElementById("emptyState");
   const errorState = document.getElementById("errorState");
   const statusRunningEl = document.getElementById("statusRunning");
@@ -493,8 +558,9 @@
       currentLocalAudio.pause();
       currentLocalAudio = null;
     }
-    // Clear the playing pulse on every tile, regardless of who started it.
-    Array.from(grid.children).forEach(tile => tile.classList.remove("playing"));
+    // Clear the playing pulse on every tile, regardless of who started it or
+    // whether it's a top-level tile or inside a (possibly collapsed) folder.
+    document.querySelectorAll(".tile.playing").forEach(tile => tile.classList.remove("playing"));
 
     // Tell the bot to stop whatever it's playing in Discord — this reaches
     // everyone in the voice channel, even if someone else started the sound.
@@ -612,32 +678,87 @@
       .catch(err => console.warn("Couldn't reach Discord bot:", err));
   }
 
+  function createTile(sound, paletteIndex) {
+    const btn = document.createElement("button");
+    btn.className = "tile";
+    btn.style.background = PALETTE[paletteIndex % PALETTE.length];
+    btn.textContent = sound.name;
+    btn.title = "Play " + sound.name;
+    if (sound._key) {
+      const badge = document.createElement("span");
+      badge.className = "key-badge";
+      badge.textContent = sound._key.toUpperCase();
+      btn.appendChild(badge);
+    }
+    btn.addEventListener("click", () => playSound(sound, btn));
+    sound._btn = btn; // so the keyboard-shortcut handler can trigger it directly,
+                       // even if it's tucked inside a collapsed folder
+    return btn;
+  }
+
   function renderGrid() {
     grid.innerHTML = "";
+    folderSections.innerHTML = "";
     if (SOUNDS.length === 0) {
       emptyState.classList.remove("hidden");
       return;
     }
     emptyState.classList.add("hidden");
 
-    SOUNDS.forEach((sound, i) => {
-      const btn = document.createElement("button");
-      btn.className = "tile";
-      btn.style.background = PALETTE[i % PALETTE.length];
-      btn.textContent = sound.name;
-      btn.title = "Play " + sound.name;
+    // Shortcuts are assigned across every sound (top-level first, then each
+    // folder in order), not just what's on-screen right now, so a shortcut
+    // still works for a clip inside a collapsed folder.
+    SOUNDS.forEach((sound, i) => { sound._key = KEY_ORDER[i] || null; });
 
-      const key = KEY_ORDER[i];
-      if (key) {
-        const badge = document.createElement("span");
-        badge.className = "key-badge";
-        badge.textContent = key.toUpperCase();
-        btn.appendChild(badge);
-        sound._key = key;
+    let paletteIndex = 0;
+    SOUNDS.filter(s => !s.folder).forEach(sound => {
+      grid.appendChild(createTile(sound, paletteIndex++));
+    });
+
+    // Group the rest by folder, in the order they first appear (SOUNDS is
+    // already sorted top-level-first, then by folder, then by name).
+    const folderOrder = [];
+    const byFolder = new Map();
+    SOUNDS.forEach(sound => {
+      if (!sound.folder) return;
+      if (!byFolder.has(sound.folder)) {
+        byFolder.set(sound.folder, []);
+        folderOrder.push(sound.folder);
       }
+      byFolder.get(sound.folder).push(sound);
+    });
 
-      btn.addEventListener("click", () => playSound(sound, btn));
-      grid.appendChild(btn);
+    folderOrder.forEach(folder => {
+      const clips = byFolder.get(folder);
+      const section = document.createElement("div");
+      section.className = "folder-section" + (folderOpenState[folder] ? " open" : "");
+
+      const header = document.createElement("button");
+      header.type = "button";
+      header.className = "folder-header";
+      const caret = document.createElement("span");
+      caret.className = "folder-caret";
+      caret.textContent = "▸";
+      const label = document.createElement("span");
+      label.className = "folder-name";
+      label.textContent = clips[0].folderName;
+      const count = document.createElement("span");
+      count.className = "folder-count";
+      count.textContent = clips.length;
+      header.append(caret, label, count);
+      header.addEventListener("click", () => {
+        const nowOpen = !section.classList.contains("open");
+        section.classList.toggle("open", nowOpen);
+        folderOpenState[folder] = nowOpen;
+        saveFolderOpenState();
+      });
+
+      const body = document.createElement("div");
+      body.className = "grid folder-grid";
+      clips.forEach(sound => body.appendChild(createTile(sound, paletteIndex++)));
+
+      section.append(header, body);
+      folderSections.appendChild(section);
     });
   }
 
@@ -654,8 +775,16 @@
     }
   }
 
+  function populateFolderDatalist() {
+    if (!folderDatalist) return;
+    const names = [...new Set(SOUNDS.filter(s => s.folder).map(s => s.folderName))].sort();
+    folderDatalist.innerHTML = names.map(n => `<option value="${n.replace(/"/g, "&quot;")}">`).join("");
+  }
+
   async function loadSounds() {
-    const apiUrl = `https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}/contents/${encodeURIComponent(SOUNDS_FOLDER)}?ref=${GITHUB_BRANCH}`;
+    // The Git Trees API (recursive) is used instead of the Contents API so
+    // sounds inside subfolders are picked up too, not just the top level.
+    const apiUrl = `https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}/git/trees/${GITHUB_BRANCH}?recursive=1`;
     try {
       const [res, volumes] = await Promise.all([
         fetch(apiUrl, { headers: { Accept: "application/vnd.github+json" } }),
@@ -668,17 +797,40 @@
         return;
       }
       if (!res.ok) throw new Error("GitHub API responded with " + res.status);
-      const entries = await res.json();
+      const data = await res.json();
+      const prefix = SOUNDS_FOLDER + "/";
 
-      SOUNDS = entries
-        .filter(e => e.type === "file" && AUDIO_EXTS.has((e.name.split(".").pop() || "").toLowerCase()))
-        .sort((a, b) => a.name.localeCompare(b.name))
-        .map(e => ({ name: humanize(e.name), url: e.download_url, gain: volumes[e.name] || 1 }));
+      SOUNDS = data.tree
+        .filter(e =>
+          e.type === "blob" &&
+          e.path.startsWith(prefix) &&
+          AUDIO_EXTS.has((e.path.split(".").pop() || "").toLowerCase())
+        )
+        .map(e => {
+          const relPath = e.path.slice(prefix.length);
+          const slashIdx = relPath.lastIndexOf("/");
+          const folder = slashIdx === -1 ? null : relPath.slice(0, slashIdx);
+          const filename = slashIdx === -1 ? relPath : relPath.slice(slashIdx + 1);
+          const url =
+            `https://raw.githubusercontent.com/${GITHUB_OWNER}/${GITHUB_REPO}/${GITHUB_BRANCH}/` +
+            e.path.split("/").map(encodeURIComponent).join("/");
+          return {
+            name: humanize(filename),
+            url,
+            gain: volumes[relPath] || 1,
+            folder,
+            folderName: folder ? humanize(folder) : null,
+            relPath,
+          };
+        })
+        .sort((a, b) => (a.folder || "").localeCompare(b.folder || "") || a.name.localeCompare(b.name));
 
+      populateFolderDatalist();
       errorState.classList.add("hidden");
       renderGrid();
     } catch (err) {
       grid.innerHTML = "";
+      folderSections.innerHTML = "";
       emptyState.classList.add("hidden");
       errorState.classList.remove("hidden");
       errorState.innerHTML =
@@ -693,10 +845,9 @@
     const tag = (e.target && e.target.tagName) || "";
     if (tag === "INPUT" || tag === "TEXTAREA") return;
 
-    const idx = SOUNDS.findIndex(s => s._key === e.key.toLowerCase());
-    if (idx !== -1) {
-      const tileEl = grid.children[idx];
-      if (tileEl) playSound(SOUNDS[idx], tileEl);
+    const sound = SOUNDS.find(s => s._key === e.key.toLowerCase());
+    if (sound && sound._btn) {
+      playSound(sound, sound._btn);
     }
   });
 
@@ -784,6 +935,8 @@
   const addSoundOverlay = document.getElementById("addSoundOverlay");
   const soundFileInput = document.getElementById("soundFileInput");
   const soundNameInput = document.getElementById("soundNameInput");
+  const soundFolderInput = document.getElementById("soundFolderInput");
+  const folderDatalist = document.getElementById("folderDatalist");
   const addSoundStatusEl = document.getElementById("addSoundStatus");
   const addSoundCancelBtn = document.getElementById("addSoundCancelBtn");
   const addSoundSubmitBtn = document.getElementById("addSoundSubmitBtn");
@@ -801,6 +954,7 @@
   function openAddSoundModal() {
     soundFileInput.value = "";
     soundNameInput.value = "";
+    soundFolderInput.value = "";
     if (!BOT_BASE_URL) {
       setAddSoundStatus("err", "The bot isn't running right now, so uploads aren't available. Try again once it's back up.");
     } else {
@@ -855,7 +1009,7 @@
           "Content-Type": "application/json",
           "x-play-secret": BOT_SECRET,
         },
-        body: JSON.stringify({ name, filename: file.name, data }),
+        body: JSON.stringify({ name, filename: file.name, data, folder: soundFolderInput.value.trim() }),
       });
       const result = await res.json().catch(() => ({}));
       if (!res.ok || !result.ok) {
