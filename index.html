@@ -439,12 +439,12 @@
       <input type="file" id="soundFileInput" accept=".mp3,.wav,.ogg,.m4a,.flac,audio/*" />
     </div>
     <div class="field">
-      <label for="soundNameInput">Name (what shows on the tile)</label>
+      <label for="soundNameInput">Name (optional — defaults to the file name)</label>
       <input type="text" id="soundNameInput" placeholder="e.g. Oh No" maxlength="60" />
     </div>
     <div class="field">
-      <label for="soundFolderInput">Folder (optional)</label>
-      <input type="text" id="soundFolderInput" list="folderDatalist" placeholder="e.g. Call of Duty — leave blank for none" maxlength="60" />
+      <label for="soundFolderInput">Folder (defaults to Misc Clips — pick another or type a new one)</label>
+      <input type="text" id="soundFolderInput" list="folderDatalist" placeholder="e.g. Call of Duty" maxlength="60" />
       <datalist id="folderDatalist"></datalist>
     </div>
     <div id="addSoundStatus" class="modal-status hidden"></div>
@@ -478,6 +478,7 @@
   // add another name here whenever the bot gets invited somewhere new.
   const DISCORD_SERVERS = ["YMAC Therapy Session"];
 
+  const DEFAULT_UPLOAD_FOLDER = "Misc Clips"; // must match DEFAULT_UPLOAD_FOLDER in bot.js
   const KEY_ORDER = "1234567890qwertyuiopasdfghjklzxcvbnm".split("");
   const PALETTE = ["#7c5cff", "#22c55e", "#ef4444", "#eab308", "#06b6d4", "#f97316", "#ec4899", "#8b5cf6", "#10b981"];
   const AUDIO_EXTS = new Set(["mp3", "wav", "ogg", "m4a", "flac"]);
@@ -954,7 +955,7 @@
   function openAddSoundModal() {
     soundFileInput.value = "";
     soundNameInput.value = "";
-    soundFolderInput.value = "";
+    soundFolderInput.value = DEFAULT_UPLOAD_FOLDER;
     if (!BOT_BASE_URL) {
       setAddSoundStatus("err", "The bot isn't running right now, so uploads aren't available. Try again once it's back up.");
     } else {
@@ -993,10 +994,7 @@
       setAddSoundStatus("err", "Choose an audio file first.");
       return;
     }
-    if (!name) {
-      setAddSoundStatus("err", "Give the sound a name.");
-      return;
-    }
+    // Name is optional — the bot falls back to the file's own name when it's left blank.
 
     addSoundSubmitBtn.disabled = true;
     setAddSoundStatus("ok", "Uploading…");
