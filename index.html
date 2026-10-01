@@ -14,6 +14,7 @@
     --accent: #7c5cff;
     --danger: #ef4444;
     --tile-radius: 14px;
+    --tile-size: 140px; /* overridden by JS to fit everything on screen without scrolling */
   }
   * { box-sizing: border-box; }
   html, body {
@@ -190,7 +191,7 @@
 
   .grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(var(--tile-size), 1fr));
     gap: 14px;
     margin: 20px 0 30px;
   }
@@ -261,7 +262,7 @@
   }
   .folder-grid {
     display: none;
-    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(var(--tile-size), 1fr));
     gap: 14px;
     margin: 14px 0 0;
   }
@@ -744,6 +745,7 @@
         const nowOpen = !section.classList.contains("open");
         section.classList.toggle("open", nowOpen);
         folderOpenState[folder] = nowOpen; // kept in memory only for this page load
+        fitTilesToViewport();
       });
 
       const body = document.createElement("div");
@@ -753,7 +755,65 @@
       section.append(header, body);
       folderSections.appendChild(section);
     });
+
+    fitTilesToViewport();
   }
+
+  // ---- Auto-sizing tiles to fit the screen without scrolling -----------
+  // Shrinks every tile (via the --tile-size CSS variable, which both grids'
+  // column widths are based on) just enough that everything currently
+  // visible — top-level tiles, folder headers, and any open folder's own
+  // tiles — fits on screen with no vertical scrollbar. Never shrinks below
+  // MIN_TILE_SIZE; if even that doesn't fit (a lot of sounds visible at
+  // once), it stays at the minimum and the page scrolls normally instead.
+
+  const MIN_TILE_SIZE = 90;
+  const MAX_TILE_SIZE = 220;
+
+  function setTileSize(px) {
+    document.documentElement.style.setProperty("--tile-size", px + "px");
+  }
+
+  function pageFitsViewport() {
+    // +1px fudge for sub-pixel rounding across browsers.
+    return document.documentElement.scrollHeight <= window.innerHeight + 1;
+  }
+
+  function fitTilesToViewport() {
+    if (SOUNDS.length === 0) return;
+
+    // Try the largest size first — if everything already fits, we're done
+    // and tiles stay nice and big instead of needlessly shrinking.
+    setTileSize(MAX_TILE_SIZE);
+    if (pageFitsViewport()) return;
+
+    // Otherwise binary-search the largest size in [MIN, MAX) that still
+    // fits without scrolling. Bigger tiles -> fewer columns -> more rows ->
+    // taller page, so "fits" is monotonically decreasing as size grows,
+    // which is exactly what binary search needs.
+    let lo = MIN_TILE_SIZE;
+    let hi = MAX_TILE_SIZE;
+    let best = MIN_TILE_SIZE;
+    while (lo <= hi) {
+      const mid = Math.floor((lo + hi) / 2);
+      setTileSize(mid);
+      if (pageFitsViewport()) {
+        best = mid;
+        lo = mid + 1;
+      } else {
+        hi = mid - 1;
+      }
+    }
+    // Lands on MIN_TILE_SIZE (and a normal scrollbar) if even the minimum
+    // doesn't fit everything currently visible.
+    setTileSize(best);
+  }
+
+  let fitTilesResizeTimer = null;
+  window.addEventListener("resize", () => {
+    clearTimeout(fitTilesResizeTimer);
+    fitTilesResizeTimer = setTimeout(fitTilesToViewport, 150);
+  });
 
   async function fetchVolumes() {
     // Best-effort: per-sound gain for balancing loud/quiet clips. Missing or
