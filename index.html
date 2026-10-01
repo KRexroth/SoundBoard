@@ -488,18 +488,11 @@
   let idleDeadline = null; // ms-since-epoch when the bot will auto-leave, or null
   let currentLocalAudio = null; // the Audio() object currently playing locally in this browser, if any
 
-  // Which folders are expanded, remembered per-browser so it doesn't reset on
-  // every reload. Falls back to "all collapsed" if storage isn't available.
+  // Which folders are expanded. Always starts fully collapsed on page load —
+  // intentionally not remembered across reloads, so every visitor sees a
+  // clean, tidy board each time instead of whatever was left open before.
+  // Still toggles normally (and stays open) while this page stays loaded.
   let folderOpenState = {};
-  try {
-    folderOpenState = JSON.parse(localStorage.getItem("soundboard-open-folders") || "{}");
-  } catch { folderOpenState = {}; }
-
-  function saveFolderOpenState() {
-    try {
-      localStorage.setItem("soundboard-open-folders", JSON.stringify(folderOpenState));
-    } catch {}
-  }
 
   const grid = document.getElementById("grid");
   const folderSections = document.getElementById("folderSections");
@@ -750,8 +743,7 @@
       header.addEventListener("click", () => {
         const nowOpen = !section.classList.contains("open");
         section.classList.toggle("open", nowOpen);
-        folderOpenState[folder] = nowOpen;
-        saveFolderOpenState();
+        folderOpenState[folder] = nowOpen; // kept in memory only for this page load
       });
 
       const body = document.createElement("div");
