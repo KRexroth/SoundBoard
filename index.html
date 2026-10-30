@@ -317,6 +317,8 @@
 
   .add-sound-row {
     display: flex;
+    flex-wrap: wrap;
+    align-items: center;
     justify-content: center;
     gap: 12px;
     margin: 0 0 20px;
@@ -336,21 +338,18 @@
   }
   .stop-btn:hover { background: #d63c3c; }
 
-  .sort-row {
+  .sort-control {
     display: flex;
-    flex-wrap: wrap;
     align-items: center;
-    justify-content: center;
     gap: 10px;
-    margin: -6px 0 18px;
   }
-  .sort-row label {
+  .sort-control label {
     font-size: 0.8rem;
     color: var(--muted);
     text-transform: uppercase;
     letter-spacing: 0.03em;
   }
-  .sort-row select {
+  .sort-control select {
     font: inherit;
     font-size: 0.9rem;
     color: var(--text);
@@ -496,19 +495,18 @@
   <div class="add-sound-row">
     <button type="button" id="stopBtn" class="stop-btn">⏹ Stop</button>
     <button type="button" id="addSoundBtn" class="add-sound-btn">+ Add A Sound</button>
-  </div>
-
-  <div class="sort-row">
-    <label for="sortSelect">Sort By</label>
-    <select id="sortSelect">
-      <option value="default">Default</option>
-      <option value="newest">Newest First</option>
-      <option value="oldest">Oldest First</option>
-      <option value="most-played">Most Played (All Time)</option>
-      <option value="least-played">Least Played (All Time)</option>
-      <option value="recent">Most Recent Plays First</option>
-      <option value="least-recent">Least Recent Plays First</option>
-    </select>
+    <div class="sort-control">
+      <label for="sortSelect">Sort By</label>
+      <select id="sortSelect">
+        <option value="default">Default</option>
+        <option value="newest">Newest First</option>
+        <option value="oldest">Oldest First</option>
+        <option value="most-played">Most Played (All Time)</option>
+        <option value="least-played">Least Played (All Time)</option>
+        <option value="recent">Most Recent Plays First</option>
+        <option value="least-recent">Least Recent Plays First</option>
+      </select>
+    </div>
     <div id="sortHint" class="sort-hint hidden">Play counts and dates come from the bot, which isn't reachable right now — showing the default order for now.</div>
   </div>
 
