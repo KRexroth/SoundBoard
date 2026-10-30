@@ -867,18 +867,23 @@
     updateSortHint();
   }
 
+  function setShowStats(on) {
+    showStatsToggle.checked = on;
+    document.body.classList.toggle("show-stats", on);
+    if (on) loadStats();
+    fitTilesToViewport();
+  }
+
   sortSelect.addEventListener("change", () => {
     sortMode = sortSelect.value;
+    // Any sort other than Default is based on the stats, so show them too.
+    if (sortMode !== "default" && !showStatsToggle.checked) setShowStats(true);
     applySort();
     // Grab fresh numbers, then re-sort once more if anything moved.
     if (sortMode !== "default") loadStats().then(applySort);
   });
 
-  showStatsToggle.addEventListener("change", () => {
-    document.body.classList.toggle("show-stats", showStatsToggle.checked);
-    if (showStatsToggle.checked) loadStats();
-    fitTilesToViewport();
-  });
+  showStatsToggle.addEventListener("change", () => setShowStats(showStatsToggle.checked));
   // Browsers can restore a ticked checkbox on reload; this should always start off.
   showStatsToggle.checked = false;
 
