@@ -896,10 +896,9 @@
       .then(({ res, data }) => {
         if (!res.ok) {
           console.warn("Discord bot didn't play it:", data.error || res.status);
-        } else {
-          // The bot just logged a play — pick up the new counts shortly.
-          setTimeout(loadStats, 700);
         }
+        // The bot logs the play either way — pick up the new counts shortly.
+        setTimeout(loadStats, 700);
       })
       .catch(err => console.warn("Couldn't reach Discord bot:", err));
   }
