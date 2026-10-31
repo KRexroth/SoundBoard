@@ -503,6 +503,8 @@
         <option value="oldest">Oldest First</option>
         <option value="most-played">Most Played (All Time)</option>
         <option value="least-played">Least Played (All Time)</option>
+        <option value="most-played-recent">Most Played (Recent)</option>
+        <option value="least-played-recent">Least Played (Recent)</option>
         <option value="recent">Most Recent Plays First</option>
         <option value="least-recent">Least Recent Plays First</option>
       </select>
@@ -837,6 +839,15 @@
     },
     "least-played": (a, b) => {
       const x = (statOf(a) || {}).total || 0, y = (statOf(b) || {}).total || 0;
+      return (x - y) || (a._idx - b._idx);
+    },
+    // "Recent" = plays in the last 12 hours.
+    "most-played-recent": (a, b) => {
+      const x = (statOf(a) || {}).last12h || 0, y = (statOf(b) || {}).last12h || 0;
+      return (y - x) || (a._idx - b._idx);
+    },
+    "least-played-recent": (a, b) => {
+      const x = (statOf(a) || {}).last12h || 0, y = (statOf(b) || {}).last12h || 0;
       return (x - y) || (a._idx - b._idx);
     },
     // "Last played" timestamps: a sound that's never been played counts as 0,
