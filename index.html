@@ -292,17 +292,6 @@
   body.show-stats .stat-badge { display: block; }
   body.show-stats .tile { padding-bottom: 38px; }
 
-  .key-badge {
-    position: absolute;
-    top: 6px;
-    left: 8px;
-    font-size: 0.68rem;
-    font-weight: 700;
-    background: rgba(0,0,0,0.35);
-    padding: 2px 6px;
-    border-radius: 6px;
-    letter-spacing: 0.02em;
-  }
   .empty-state, .error-state {
     color: var(--muted);
     background: var(--panel);
@@ -566,7 +555,6 @@
   const DISCORD_SERVERS = ["YMAC Therapy Session"];
 
   const DEFAULT_UPLOAD_FOLDER = "Misc Clips"; // must match DEFAULT_UPLOAD_FOLDER in bot.js
-  const KEY_ORDER = "1234567890qwertyuiopasdfghjklzxcvbnm".split("");
   const PALETTE = ["#7c5cff", "#22c55e", "#ef4444", "#eab308", "#06b6d4", "#f97316", "#ec4899", "#8b5cf6", "#10b981"];
   const AUDIO_EXTS = new Set(["mp3", "wav", "ogg", "m4a", "flac"]);
 
@@ -923,19 +911,12 @@
     btn.style.background = PALETTE[paletteIndex % PALETTE.length];
     btn.textContent = sound.name;
     btn.title = "Play " + sound.name;
-    if (sound._key) {
-      const badge = document.createElement("span");
-      badge.className = "key-badge";
-      badge.textContent = sound._key.toUpperCase();
-      btn.appendChild(badge);
-    }
     const stat = document.createElement("span");
     stat.className = "stat-badge";
     btn.appendChild(stat);
     sound._statEl = stat;
     btn.addEventListener("click", () => playSound(sound, btn));
-    sound._btn = btn; // so the keyboard-shortcut handler can trigger it directly,
-                       // even if it's tucked inside a collapsed folder
+    sound._btn = btn; // so sorting can reorder tiles, even inside a collapsed folder
     return btn;
   }
 
@@ -949,12 +930,9 @@
     }
     emptyState.classList.add("hidden");
 
-    // Shortcuts are assigned across every sound (top-level first, then each
-    // folder in order), not just what's on-screen right now, so a shortcut
-    // still works for a clip inside a collapsed folder.
     // _idx remembers the default order, which sorting falls back to / uses
     // as its tie-break.
-    SOUNDS.forEach((sound, i) => { sound._key = KEY_ORDER[i] || null; sound._idx = i; });
+    SOUNDS.forEach((sound, i) => { sound._idx = i; });
 
     let paletteIndex = 0;
     const topLevel = SOUNDS.filter(s => !s.folder);
@@ -1149,16 +1127,6 @@
       console.warn("Failed to load sounds:", err);
     }
   }
-
-  document.addEventListener("keydown", (e) => {
-    const tag = (e.target && e.target.tagName) || "";
-    if (tag === "INPUT" || tag === "TEXTAREA") return;
-
-    const sound = SOUNDS.find(s => s._key === e.key.toLowerCase());
-    if (sound && sound._btn) {
-      playSound(sound, sound._btn);
-    }
-  });
 
   // ---- Hamburger menu ------------------------------------------------------
 
